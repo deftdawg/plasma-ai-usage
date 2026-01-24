@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.plasma5support as Plasma5Support
+import "Providers.js" as Providers
 
 PlasmoidItem {
     id: root
@@ -14,23 +15,19 @@ PlasmoidItem {
         currentLanguage: Plasmoid.configuration.language || "system"
     }
 
-    property real sessionUsagePercent: 0
-    property real weeklyUsagePercent: 0
-    property real sonnetWeeklyPercent: 0
-    property real opusWeeklyPercent: 0
     property string lastUpdate: ""
-    property string planName: ""
-    property string sessionReset: ""
-    property string weeklyReset: ""
     property string errorMsg: ""
-    property string accessToken: ""
     property bool isLoading: false
-    property var sessionResetTime: null
-    property var weeklyResetTime: null
+    property string claudeToken: ""
+
+    // Model to store provider data
+    ListModel {
+        id: providersModel
+    }
 
     readonly property string usageApiUrl: "https://api.anthropic.com/api/oauth/usage"
 
-    // Data source for reading credentials file
+    // Data source for reading credentials files
     Plasma5Support.DataSource {
         id: fileReader
         engine: "executable"
@@ -40,103 +37,106 @@ PlasmoidItem {
             var stdout = data["stdout"] || ""
             disconnectSource(sourceName)
 
-            console.log("Claude Usage: Got credentials, length:", stdout.length)
+            console.log("AI Usage: Got data, length:", stdout.length)
+            
+            providersModel.clear()
+            
+            var parts = stdout.split("___SEP___")
+            var claudeData = parts[0] ? parts[0].trim() : ""
+            var antigravityData = parts[1] ? parts[1].trim() : ""
+            var ampData = parts[2] ? parts[2].trim() : ""
 
-            if (stdout.length > 10) {
-                try {
-                    var creds = JSON.parse(stdout)
-                    var oauth = creds.claudeAiOauth || {}
-                    root.accessToken = oauth.accessToken || ""
-
-                    // Get plan name from tier
-                    var tier = oauth.rateLimitTier || "default_claude_pro"
-                    var planMap = {
-                        "default_claude_pro": "Pro",
-                        "default_claude_max_5x": "Max 5x",
-                        "default_claude_max_20x": "Max 20x"
-                    }
-                    root.planName = planMap[tier] || tier
-
-                    console.log("Claude Usage: Token found, plan:", root.planName)
-
-                    if (root.accessToken) {
-                        fetchUsageFromApi()
-                    } else {
-                        root.errorMsg = i18n.tr("Not logged in")
-                        root.isLoading = false
-                    }
-                } catch (e) {
-                    console.log("Claude Usage: Failed to parse credentials:", e)
-                    root.errorMsg = "Not logged in"
-                    root.isLoading = false
-                }
-            } else {
-                console.log("Claude Usage: No credentials file found")
-                root.errorMsg = "Not logged in"
-                root.isLoading = false
+            // Process Claude
+            var claudeProv = Providers.parseClaudeCredentials(claudeData)
+            if (claudeProv) {
+                // Initialize with basic data, fetch details later
+                claudeProv.sessionUsage = 0
+                claudeProv.weeklyUsage = 0
+                claudeProv.sonnetUsage = 0
+                claudeProv.opusUsage = 0
+                claudeProv.sessionReset = ""
+                claudeProv.weeklyReset = ""
+                
+                providersModel.append(claudeProv)
+                root.claudeToken = claudeProv.token
+                fetchClaudeUsage()
             }
+
+            // Process Antigravity
+            var antigravityProv = Providers.parseAntigravityConfig(antigravityData)
+            if (antigravityProv) {
+                providersModel.append(antigravityProv)
+            }
+
+            // Process Amp
+            var ampProv = Providers.parseAmpConfig(ampData)
+            if (ampProv) {
+                providersModel.append(ampProv)
+            }
+            
+            if (providersModel.count === 0) {
+                root.errorMsg = i18n.tr("No accounts found")
+            } else {
+                root.errorMsg = ""
+            }
+            
+            root.lastUpdate = Qt.formatTime(new Date(), "hh:mm:ss")
+            root.isLoading = false
         }
     }
 
     function loadCredentials() {
         root.isLoading = true
         root.errorMsg = ""
-        // Use $HOME environment variable
-        fileReader.connectSource("cat $HOME/.claude/.credentials.json 2>/dev/null")
+        // Read all config files separated by a delimiter
+        var cmd = "cat $HOME/.claude/.credentials.json 2>/dev/null; echo '___SEP___'; cat $HOME/.antigravity/usage.json 2>/dev/null; echo '___SEP___'; cat $HOME/.amp/usage.json 2>/dev/null"
+        fileReader.connectSource(cmd)
     }
 
-    function fetchUsageFromApi() {
+    function fetchClaudeUsage() {
+        if (!root.claudeToken) return
+
         var xhr = new XMLHttpRequest()
         xhr.open("GET", usageApiUrl)
-        xhr.setRequestHeader("Authorization", "Bearer " + root.accessToken)
+        xhr.setRequestHeader("Authorization", "Bearer " + root.claudeToken)
         xhr.setRequestHeader("Content-Type", "application/json")
         xhr.setRequestHeader("anthropic-beta", "oauth-2025-04-20")
 
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
-                root.isLoading = false
-
                 if (xhr.status === 200) {
                     try {
                         var data = JSON.parse(xhr.responseText)
-
                         var fiveHour = data.five_hour || {}
                         var sevenDay = data.seven_day || {}
                         var sevenDaySonnet = data.seven_day_sonnet || {}
                         var sevenDayOpus = data.seven_day_opus || {}
 
-                        root.sessionUsagePercent = fiveHour.utilization || 0
-                        root.weeklyUsagePercent = sevenDay.utilization || 0
-                        root.sonnetWeeklyPercent = sevenDaySonnet ? (sevenDaySonnet.utilization || 0) : 0
-                        root.opusWeeklyPercent = sevenDayOpus ? (sevenDayOpus.utilization || 0) : 0
-
-                        if (fiveHour.resets_at) {
-                            root.sessionResetTime = new Date(fiveHour.resets_at)
-                            root.sessionReset = Qt.formatTime(root.sessionResetTime, "hh:mm")
+                        // Find Claude item in model and update it
+                        for (var i = 0; i < providersModel.count; i++) {
+                            if (providersModel.get(i).provider === "claude") {
+                                providersModel.setProperty(i, "sessionUsage", fiveHour.utilization || 0)
+                                providersModel.setProperty(i, "weeklyUsage", sevenDay.utilization || 0)
+                                providersModel.setProperty(i, "sonnetUsage", sevenDaySonnet ? (sevenDaySonnet.utilization || 0) : 0)
+                                providersModel.setProperty(i, "opusUsage", sevenDayOpus ? (sevenDayOpus.utilization || 0) : 0)
+                                
+                                if (fiveHour.resets_at) {
+                                    providersModel.setProperty(i, "sessionReset", Qt.formatTime(new Date(fiveHour.resets_at), "hh:mm"))
+                                }
+                                if (sevenDay.resets_at) {
+                                    providersModel.setProperty(i, "weeklyReset", Qt.formatDateTime(new Date(sevenDay.resets_at), "MMM d, hh:mm"))
+                                }
+                                break
+                            }
                         }
-                        if (sevenDay.resets_at) {
-                            root.weeklyResetTime = new Date(sevenDay.resets_at)
-                            root.weeklyReset = Qt.formatDateTime(root.weeklyResetTime, "MMM d, hh:mm")
-                        }
-
-                        root.lastUpdate = Qt.formatTime(new Date(), "hh:mm:ss")
-                        root.errorMsg = ""
-
-                        console.log("Claude Usage: API success - session:", root.sessionUsagePercent, "weekly:", root.weeklyUsagePercent)
                     } catch (e) {
                         console.log("Claude Usage: JSON parse error:", e)
-                        root.errorMsg = "Parse error"
                     }
-                } else if (xhr.status === 401) {
-                    root.errorMsg = i18n.tr("Token expired")
-                    console.log("Claude Usage: 401 Unauthorized")
                 } else {
-                    root.errorMsg = i18n.tr("API error") + " (" + xhr.status + ")"
-                    console.log("Claude Usage: API error:", xhr.status, xhr.statusText)
+                     console.log("Claude Usage: API error:", xhr.status)
                 }
             }
         }
-
         xhr.send()
     }
 
@@ -144,7 +144,7 @@ PlasmoidItem {
         loadCredentials()
     }
 
-    // Compact representation (panel) - shows both percentages
+    // Compact representation (panel)
     compactRepresentation: Item {
         Layout.minimumWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
         Layout.minimumHeight: Kirigami.Units.iconSizes.medium
@@ -160,76 +160,49 @@ PlasmoidItem {
             anchors.centerIn: parent
             spacing: Kirigami.Units.smallSpacing
 
-            // Claude icon
             Kirigami.Icon {
                 Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
                 Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
-                source: Qt.resolvedUrl("../icons/claude.svg")
-                Layout.rightMargin: Kirigami.Units.smallSpacing
+                source: Qt.resolvedUrl("../icons/claude.svg") // Keep claude icon or make generic
             }
 
-            // Error state
+            // Show summary of first provider or error
             PlasmaComponents.Label {
                 visible: root.errorMsg !== ""
                 text: "⚠"
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
                 color: Kirigami.Theme.negativeTextColor
             }
 
-            // Normal state
-            Rectangle {
-                visible: root.errorMsg === ""
-                Layout.preferredWidth: 10
-                Layout.preferredHeight: 10
-                radius: 5
-                color: getUsageColor(root.sessionUsagePercent)
-            }
-
-            PlasmaComponents.Label {
-                visible: root.errorMsg === ""
-                text: Math.round(root.sessionUsagePercent) + "%"
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
-                font.bold: true
-            }
-
-            PlasmaComponents.Label {
-                visible: root.errorMsg === ""
-                text: "|"
-                opacity: 0.5
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
-            }
-
-            Rectangle {
-                visible: root.errorMsg === ""
-                Layout.preferredWidth: 10
-                Layout.preferredHeight: 10
-                radius: 5
-                color: getUsageColor(root.weeklyUsagePercent)
-            }
-
-            PlasmaComponents.Label {
-                visible: root.errorMsg === ""
-                text: Math.round(root.weeklyUsagePercent) + "%"
-                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize
-                font.bold: true
-            }
-
-            // Error text
-            PlasmaComponents.Label {
-                visible: root.errorMsg !== ""
-                text: root.errorMsg
-                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                color: Kirigami.Theme.negativeTextColor
+            // If we have providers, show the first one's primary stat
+            RowLayout {
+                visible: root.errorMsg === "" && providersModel.count > 0
+                spacing: Kirigami.Units.smallSpacing
+                
+                Repeater {
+                    model: Math.min(providersModel.count, 1) // Only show first one for now in compact
+                    delegate: RowLayout {
+                        Rectangle {
+                            Layout.preferredWidth: 10
+                            Layout.preferredHeight: 10
+                            radius: 5
+                            color: getUsageColor(model.sessionUsage !== undefined ? model.sessionUsage : (model.free ? (model.free.used / model.free.limit * 100) : 0))
+                        }
+                        PlasmaComponents.Label {
+                            text: (model.sessionUsage !== undefined ? Math.round(model.sessionUsage) : (model.free ? Math.round(model.free.used / model.free.limit * 100) : 0)) + "%"
+                            font.bold: true
+                        }
+                    }
+                }
             }
         }
     }
 
     // Full representation (popup)
     fullRepresentation: Item {
-        Layout.minimumWidth: Kirigami.Units.gridUnit * 14
-        Layout.minimumHeight: Kirigami.Units.gridUnit * 16
-        Layout.preferredWidth: Kirigami.Units.gridUnit * 16
-        Layout.preferredHeight: Kirigami.Units.gridUnit * 18
+        Layout.minimumWidth: Kirigami.Units.gridUnit * 16
+        Layout.minimumHeight: Kirigami.Units.gridUnit * 20
+        Layout.preferredWidth: Kirigami.Units.gridUnit * 18
+        Layout.preferredHeight: Kirigami.Units.gridUnit * 24
 
         ColumnLayout {
             anchors.fill: parent
@@ -240,53 +213,18 @@ PlasmoidItem {
             RowLayout {
                 Layout.fillWidth: true
                 PlasmaComponents.Label {
-                    text: i18n.tr("Claude Usage")
+                    text: i18n.tr("AI Usage")
                     font.bold: true
                     font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.3
                 }
                 Item { Layout.fillWidth: true }
-                Rectangle {
-                    Layout.preferredWidth: planLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
-                    Layout.preferredHeight: planLabel.implicitHeight + Kirigami.Units.smallSpacing
-                    radius: 3
-                    color: Kirigami.Theme.highlightColor
-                    PlasmaComponents.Label {
-                        id: planLabel
-                        anchors.centerIn: parent
-                        text: root.planName
-                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                        color: Kirigami.Theme.highlightedTextColor
-                    }
+                PlasmaComponents.Label {
+                    text: root.lastUpdate
+                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                    color: Kirigami.Theme.disabledTextColor
                 }
             }
 
-            // Error message
-            Rectangle {
-                visible: root.errorMsg !== ""
-                Layout.fillWidth: true
-                Layout.preferredHeight: errorColumn.implicitHeight + Kirigami.Units.largeSpacing
-                radius: 5
-                color: Kirigami.Theme.negativeBackgroundColor
-
-                ColumnLayout {
-                    id: errorColumn
-                    anchors.fill: parent
-                    anchors.margins: Kirigami.Units.smallSpacing
-
-                    PlasmaComponents.Label {
-                        text: "⚠ " + root.errorMsg
-                        color: Kirigami.Theme.negativeTextColor
-                        font.bold: true
-                    }
-                    PlasmaComponents.Label {
-                        text: i18n.tr("Run 'claude' to log in")
-                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                        color: Kirigami.Theme.negativeTextColor
-                    }
-                }
-            }
-
-            // Separator
             Rectangle {
                 Layout.fillWidth: true
                 height: 1
@@ -294,198 +232,169 @@ PlasmoidItem {
                 opacity: 0.3
             }
 
-            // Session Usage
-            ColumnLayout {
+            // Providers List
+            ListView {
                 Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
+                Layout.fillHeight: true
+                clip: true
+                model: providersModel
+                spacing: Kirigami.Units.largeSpacing
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: i18n.tr("Session (5hr)")
-                        font.bold: true
-                    }
-                    Item { Layout.fillWidth: true }
-                    PlasmaComponents.Label {
-                        text: root.sessionUsagePercent.toFixed(1) + "%"
-                        color: getUsageColor(root.sessionUsagePercent)
-                        font.bold: true
-                    }
-                }
+                delegate: ColumnLayout {
+                    width: ListView.view.width
+                    spacing: Kirigami.Units.smallSpacing
 
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 10
-                    radius: 5
-                    color: Kirigami.Theme.backgroundColor
-                    border.color: Kirigami.Theme.disabledTextColor
-                    border.width: 1
+                    // Provider Header
+                    RowLayout {
+                        Layout.fillWidth: true
+                        PlasmaComponents.Label {
+                            text: model.name
+                            font.bold: true
+                            font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.1
+                        }
+                        Item { Layout.fillWidth: true }
+                        Rectangle {
+                            visible: model.plan !== undefined
+                            Layout.preferredWidth: planLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
+                            Layout.preferredHeight: planLabel.implicitHeight + Kirigami.Units.smallSpacing
+                            radius: 3
+                            color: Kirigami.Theme.highlightColor
+                            PlasmaComponents.Label {
+                                id: planLabel
+                                anchors.centerIn: parent
+                                text: model.plan || ""
+                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                color: Kirigami.Theme.highlightedTextColor
+                            }
+                        }
+                    }
+
+                    // Claude Specific UI
+                    ColumnLayout {
+                        visible: model.provider === "claude"
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        UsageBar {
+                            label: i18n.tr("Session")
+                            value: model.sessionUsage || 0
+                            subtext: model.sessionReset ? i18n.tr("Resets:") + " " + model.sessionReset : ""
+                        }
+                        UsageBar {
+                            label: i18n.tr("Weekly")
+                            value: model.weeklyUsage || 0
+                            subtext: model.weeklyReset ? i18n.tr("Resets:") + " " + model.weeklyReset : ""
+                        }
+                        
+                        // Models
+                        RowLayout {
+                            visible: (model.sonnetUsage || 0) > 0 || (model.opusUsage || 0) > 0
+                            Layout.fillWidth: true
+                            PlasmaComponents.Label { text: "Sonnet: " + Math.round(model.sonnetUsage||0) + "%"; font.pixelSize: Kirigami.Theme.smallFont.pixelSize }
+                            Item { Layout.fillWidth: true }
+                            PlasmaComponents.Label { text: "Opus: " + Math.round(model.opusUsage||0) + "%"; font.pixelSize: Kirigami.Theme.smallFont.pixelSize }
+                        }
+                    }
+
+                    // Antigravity Specific UI
+                    ColumnLayout {
+                        visible: model.provider === "antigravity"
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+                        
+                        Repeater {
+                            model: model.buckets
+                            delegate: UsageBar {
+                                label: modelData.name
+                                value: (modelData.used / modelData.limit) * 100
+                                subtext: modelData.used + "/" + modelData.limit
+                            }
+                        }
+                    }
+
+                    // Amp Specific UI
+                    ColumnLayout {
+                        visible: model.provider === "amp"
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        UsageBar {
+                            label: i18n.tr("Free Quota")
+                            value: model.free ? (model.free.used / model.free.limit * 100) : 0
+                            subtext: model.free ? (model.free.used + "/" + model.free.limit) : ""
+                        }
+                        
+                        RowLayout {
+                            Layout.fillWidth: true
+                            PlasmaComponents.Label {
+                                text: i18n.tr("Credit Balance:")
+                            }
+                            Item { Layout.fillWidth: true }
+                            PlasmaComponents.Label {
+                                text: model.credit ? (model.credit.balance + " " + model.credit.currency) : "0.00"
+                                font.bold: true
+                            }
+                        }
+                    }
+                    
+                    // Separator between items
                     Rectangle {
-                        width: parent.width * Math.min(root.sessionUsagePercent / 100, 1)
-                        height: parent.height
-                        radius: 5
-                        color: getUsageColor(root.sessionUsagePercent)
+                        Layout.fillWidth: true
+                        height: 1
+                        color: Kirigami.Theme.disabledTextColor
+                        opacity: 0.1
+                        visible: index < providersModel.count - 1
                     }
-                }
-
-                PlasmaComponents.Label {
-                    visible: root.sessionReset !== ""
-                    text: i18n.tr("Resets at:") + " " + root.sessionReset + (root.sessionResetTime ? " (" + formatTimeRemaining(root.sessionResetTime) + ")" : "")
-                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                    color: Kirigami.Theme.disabledTextColor
                 }
             }
 
-            // Weekly Usage
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: i18n.tr("Weekly (7day)")
-                        font.bold: true
-                    }
-                    Item { Layout.fillWidth: true }
-                    PlasmaComponents.Label {
-                        text: root.weeklyUsagePercent.toFixed(1) + "%"
-                        color: getUsageColor(root.weeklyUsagePercent)
-                        font.bold: true
-                    }
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 10
-                    radius: 5
-                    color: Kirigami.Theme.backgroundColor
-                    border.color: Kirigami.Theme.disabledTextColor
-                    border.width: 1
-                    Rectangle {
-                        width: parent.width * Math.min(root.weeklyUsagePercent / 100, 1)
-                        height: parent.height
-                        radius: 5
-                        color: getUsageColor(root.weeklyUsagePercent)
-                    }
-                }
-
-                PlasmaComponents.Label {
-                    visible: root.weeklyReset !== ""
-                    text: i18n.tr("Resets:") + " " + root.weeklyReset + (root.weeklyResetTime ? " (" + formatTimeRemaining(root.weeklyResetTime) + ")" : "")
-                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                    color: Kirigami.Theme.disabledTextColor
-                }
+            PlasmaComponents.Button {
+                Layout.alignment: Qt.AlignRight
+                icon.name: "view-refresh"
+                text: i18n.tr("Refresh")
+                onClicked: refresh()
             }
-
-            // Separator
-            Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Kirigami.Theme.disabledTextColor
-                opacity: 0.3
-            }
-
-            // Model breakdown
-            PlasmaComponents.Label {
-                text: i18n.tr("By Model (Weekly)")
+        }
+    }
+    
+    // Reusable Usage Bar Component
+    component UsageBar : ColumnLayout {
+        property string label
+        property real value
+        property string subtext
+        
+        spacing: 2
+        Layout.fillWidth: true
+        
+        RowLayout {
+            Layout.fillWidth: true
+            PlasmaComponents.Label { text: label; font.bold: true }
+            Item { Layout.fillWidth: true }
+            PlasmaComponents.Label { 
+                text: Math.round(value) + "%"
+                color: getUsageColor(value)
                 font.bold: true
-                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
             }
-
-            // Sonnet
-            RowLayout {
-                Layout.fillWidth: true
-                visible: root.sonnetWeeklyPercent > 0
-
-                PlasmaComponents.Label {
-                    text: i18n.tr("Sonnet")
-                }
-                Item { Layout.fillWidth: true }
-                Rectangle {
-                    Layout.preferredWidth: 60
-                    height: 8
-                    radius: 3
-                    color: Kirigami.Theme.backgroundColor
-                    border.color: Kirigami.Theme.disabledTextColor
-                    border.width: 1
-                    Rectangle {
-                        width: parent.width * Math.min(root.sonnetWeeklyPercent / 100, 1)
-                        height: parent.height
-                        radius: 3
-                        color: getUsageColor(root.sonnetWeeklyPercent)
-                    }
-                }
-                PlasmaComponents.Label {
-                    text: root.sonnetWeeklyPercent.toFixed(0) + "%"
-                    Layout.preferredWidth: 40
-                    horizontalAlignment: Text.AlignRight
-                }
-            }
-
-            // Opus
-            RowLayout {
-                Layout.fillWidth: true
-                visible: root.opusWeeklyPercent > 0
-
-                PlasmaComponents.Label {
-                    text: i18n.tr("Opus")
-                }
-                Item { Layout.fillWidth: true }
-                Rectangle {
-                    Layout.preferredWidth: 60
-                    height: 8
-                    radius: 3
-                    color: Kirigami.Theme.backgroundColor
-                    border.color: Kirigami.Theme.disabledTextColor
-                    border.width: 1
-                    Rectangle {
-                        width: parent.width * Math.min(root.opusWeeklyPercent / 100, 1)
-                        height: parent.height
-                        radius: 3
-                        color: getUsageColor(root.opusWeeklyPercent)
-                    }
-                }
-                PlasmaComponents.Label {
-                    text: root.opusWeeklyPercent.toFixed(0) + "%"
-                    Layout.preferredWidth: 40
-                    horizontalAlignment: Text.AlignRight
-                }
-            }
-
-            // No model data message
-            PlasmaComponents.Label {
-                visible: root.sonnetWeeklyPercent === 0 && root.opusWeeklyPercent === 0
-                text: i18n.tr("No model breakdown available")
-                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                color: Kirigami.Theme.disabledTextColor
-                font.italic: true
-            }
-
-            Item { Layout.fillHeight: true }
-
-            // Footer
+        }
+        Rectangle {
+            Layout.fillWidth: true
+            height: 8
+            radius: 4
+            color: Kirigami.Theme.backgroundColor
+            border.color: Kirigami.Theme.disabledTextColor
+            border.width: 1
             Rectangle {
-                Layout.fillWidth: true
-                height: 1
-                color: Kirigami.Theme.disabledTextColor
-                opacity: 0.3
+                width: parent.width * Math.min(value / 100, 1)
+                height: parent.height
+                radius: 4
+                color: getUsageColor(value)
             }
-
-            RowLayout {
-                Layout.fillWidth: true
-                PlasmaComponents.Label {
-                    text: root.lastUpdate !== "" ? i18n.tr("Updated:") + " " + root.lastUpdate : i18n.tr("Loading...")
-                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-                    color: Kirigami.Theme.disabledTextColor
-                }
-                Item { Layout.fillWidth: true }
-                PlasmaComponents.Button {
-                    icon.name: "view-refresh"
-                    text: i18n.tr("Refresh")
-                    onClicked: refresh()
-                }
-            }
+        }
+        PlasmaComponents.Label {
+            visible: subtext !== ""
+            text: subtext
+            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+            color: Kirigami.Theme.disabledTextColor
         }
     }
 
@@ -503,32 +412,10 @@ PlasmoidItem {
         return Kirigami.Theme.negativeTextColor
     }
 
-    function formatTimeRemaining(resetTime) {
-        if (!resetTime) return ""
-        var now = new Date()
-        var diff = resetTime.getTime() - now.getTime()
-        if (diff <= 0) return ""
-
-        var hours = Math.floor(diff / (1000 * 60 * 60))
-        var minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-
-        if (hours > 24) {
-            var days = Math.floor(hours / 24)
-            hours = hours % 24
-            return days + i18n.tr("d") + " " + hours + i18n.tr("h")
-        } else if (hours > 0) {
-            return hours + i18n.tr("h") + " " + minutes + i18n.tr("m")
-        } else {
-            return minutes + i18n.tr("m")
-        }
-    }
-
     Component.onCompleted: {
-        console.log("Claude Usage: Widget loaded")
         loadCredentials()
     }
 
     Plasmoid.icon: "claude-usage"
-    toolTipMainText: i18n.tr("Claude Usage")
-    toolTipSubText: i18n.tr("Session (5hr)") + ": " + Math.round(root.sessionUsagePercent) + "% | " + i18n.tr("Weekly (7day)") + ": " + Math.round(root.weeklyUsagePercent) + "%"
+    toolTipMainText: i18n.tr("AI Usage")
 }

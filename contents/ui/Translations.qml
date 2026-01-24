@@ -18,6 +18,7 @@ QtObject {
     readonly property var strings: ({
         "en_US": {
             "Claude Usage": "Claude Usage",
+            "AI Usage": "AI Usage",
             "Session (5hr)": "Session (5hr)",
             "Weekly (7day)": "Weekly (7day)",
             "By Model (Weekly)": "By Model (Weekly)",
@@ -29,6 +30,7 @@ QtObject {
             "Loading...": "Loading...",
             "Refresh": "Refresh",
             "Not logged in": "Not logged in",
+            "No accounts found": "No accounts found",
             "Token expired": "Token expired",
             "API error": "API error",
             "Run 'claude' to log in": "Run 'claude' to log in",
@@ -39,7 +41,9 @@ QtObject {
             "h": "h",
             "m": "m",
             "Refresh interval:": "Refresh interval:",
-            "minutes": "minutes"
+            "minutes": "minutes",
+            "Free Quota": "Free Quota",
+            "Credit Balance:": "Credit Balance:"
         },
         "hu_HU": {
             "Claude Usage": "Claude használat",
