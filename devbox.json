@@ -14,6 +14,18 @@
     }
   },
   "init_hook": [
-    "echo \"Welcome to the Plasma AI Usage dev environment!\""
+    "echo \"Welcome to the Plasma AI Usage dev environment!\"",
+    "echo \"\"",
+    "echo \"To build and install the widget locally:\"",
+    "echo \"  kpackagetool6 -t Plasma/Applet -i .\"",
+    "echo \"\"",
+    "echo \"To update an existing installation:\"",
+    "echo \"  kpackagetool6 -t Plasma/Applet -u .\"",
+    "echo \"\"",
+    "echo \"To view logs:\"",
+    "echo \"  journalctl --user -f | grep -i 'AI Usage'\"",
+    "echo \"\"",
+    "echo \"To restart Plasma Shell (to reload widget):\"",
+    "echo \"  kquitapp6 plasmashell && kstart plasmashell\""
   ]
 }
