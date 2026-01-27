@@ -219,7 +219,7 @@ PlasmoidItem {
                 }
                 
                 Rectangle {
-                    visible: !isAmp
+                    visible: !parent.isAmp
                     Layout.preferredWidth: 10
                     Layout.preferredHeight: 10
                     radius: 5
@@ -228,7 +228,7 @@ PlasmoidItem {
                 
                 PlasmaComponents.Label {
                     text: parent.displayText
-                    color: isAmp ? parent.displayColor : Kirigami.Theme.textColor
+                    color: parent.isAmp ? parent.displayColor : Kirigami.Theme.textColor
                     font.bold: true
                 }
             }
