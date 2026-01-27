@@ -30,7 +30,38 @@ function parseAntigravityConfig(stdout) {
     try {
         var data = JSON.parse(stdout);
         
-        // Flatten bucket data for QML ListModel compatibility
+        // Handle new format from antigravity.py
+        if (data.models) {
+            var models = data.models || [];
+            var bucket1 = models[0] || {};
+            var bucket2 = models[1] || {};
+            var bucket3 = models[2] || {};
+            
+            return {
+                provider: "antigravity",
+                name: "Antigravity",
+                icon: "antigravity.svg",
+                // Models provide 'remaining', convert to 'used' for standard bar
+                bucket1Name: bucket1.name || "Model 1",
+                bucket1Percent: bucket1.remaining !== undefined ? (100 - bucket1.remaining) : 0,
+                bucket1Used: "N/A",
+                bucket1Limit: "N/A",
+                
+                bucket2Name: bucket2.name || "Model 2",
+                bucket2Percent: bucket2.remaining !== undefined ? (100 - bucket2.remaining) : 0,
+                bucket2Used: "N/A",
+                bucket2Limit: "N/A",
+                
+                bucket3Name: bucket3.name || "Model 3",
+                bucket3Percent: bucket3.remaining !== undefined ? (100 - bucket3.remaining) : 0,
+                bucket3Used: "N/A",
+                bucket3Limit: "N/A",
+                
+                valid: true
+            };
+        }
+
+        // Fallback to legacy format
         var bucket1 = data.bucket_small || data.buckets?.[0] || {};
         var bucket2 = data.bucket_medium || data.buckets?.[1] || {};
         var bucket3 = data.bucket_large || data.buckets?.[2] || {};

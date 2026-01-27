@@ -90,9 +90,10 @@ PlasmoidItem {
         root.errorMsg = ""
         // Read all config files separated by a delimiter
         // Try 'amp usage' command first, then fallback to JSON file
+        // Try 'python3 contents/ui/antigravity.py' for Antigravity, fallback to JSON
         var cmd = "cat $HOME/.claude/.credentials.json 2>/dev/null; " + 
                   "echo '___SEP___'; " +
-                  "cat $HOME/.antigravity/usage.json 2>/dev/null; " + 
+                  "(python3 " + Qt.resolvedUrl("antigravity.py").replace("file://", "") + " 2>/dev/null || cat $HOME/.antigravity/usage.json 2>/dev/null); " + 
                   "echo '___SEP___'; " +
                   "(amp usage 2>/dev/null || cat $HOME/.amp/usage.json 2>/dev/null)"
         fileReader.connectSource(cmd)
@@ -371,12 +372,12 @@ PlasmoidItem {
                         UsageBar {
                             label: model.bucket2Name || "Medium"
                             value: model.bucket2Percent || 0
-                            subtext: (model.bucket2Used || 0) + "/" + (model.bucket2Limit || 0)
+                            subtext: (model.bucket2Limit === "N/A") ? "" : ((model.bucket2Used || 0) + "/" + (model.bucket2Limit || 0))
                         }
                         UsageBar {
                             label: model.bucket3Name || "Large"
                             value: model.bucket3Percent || 0
-                            subtext: (model.bucket3Used || 0) + "/" + (model.bucket3Limit || 0)
+                            subtext: (model.bucket3Limit === "N/A") ? "" : ((model.bucket3Used || 0) + "/" + (model.bucket3Limit || 0))
                         }
                     }
 

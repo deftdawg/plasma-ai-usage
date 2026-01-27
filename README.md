@@ -63,11 +63,11 @@ Claude works automatically if you're logged in via Claude Code CLI:
 
 ### Antigravity
 
-Antigravity reads usage data from a local JSON file. You need to create or have a tool that maintains this file.
+Antigravity support attempts to automatically detect the local language server process (Linux only) to fetch live usage data.
 
-**File location:** `~/.antigravity/usage.json`
+If automatic detection fails, it falls back to reading usage data from a local JSON file: `~/.antigravity/usage.json`
 
-**Expected format:**
+**Fallback JSON format:**
 
 ```json
 {
@@ -209,6 +209,10 @@ GPL-3.0-or-later
 ## Author
 
 deftdawg, izll
+
+## Credits
+
+- **Tract0r (<@cornfields>)**: Author of `@levitycheck.py`, which provided the logic for detecting and querying the Antigravity local language server.
 
 ## Version History
 
