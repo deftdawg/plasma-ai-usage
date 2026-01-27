@@ -17,7 +17,10 @@
       "echo \"  journalctl --user -f | grep -i 'AI Usage'\"",
       "echo \"\"",
       "echo \"To restart Plasma Shell (to reload widget):\"",
-      "echo \"  kquitapp6 plasmashell && kstart plasmashell\""
+      "echo \"  kquitapp6 plasmashell && kstart plasmashell\"",
+      "echo \"\"",
+      "echo \"To test without restarting Plasma (requires plasma-sdk):\"",
+      "echo \"  plasmoidviewer -a .\""
     ],
     "scripts": {
       "test": [
