@@ -174,15 +174,15 @@ PlasmoidItem {
             anchors.fill: parent
             onClicked: root.expanded = !root.expanded
             hoverEnabled: true
-        }
-        
-        PlasmaComponents.ToolTip.visible: compactMouseArea.containsMouse
-        PlasmaComponents.ToolTip.text: {
-            var p = usageRow.firstProvider
-            if (p && p.provider === "amp") {
-                return getAmpTooltipText(p)
+            
+            PlasmaComponents.ToolTip.visible: containsMouse
+            PlasmaComponents.ToolTip.text: {
+                var p = usageRow.firstProvider
+                if (p && p.provider === "amp") {
+                    return getAmpTooltipText(p)
+                }
+                return root.toolTipSubText
             }
-            return root.toolTipSubText
         }
 
         RowLayout {
