@@ -33,30 +33,54 @@ function parseAntigravityConfig(stdout) {
         // Handle new format from antigravity.py
         if (data.models) {
             var models = data.models || [];
-            var bucket1 = models[0] || {};
-            var bucket2 = models[1] || {};
-            var bucket3 = models[2] || {};
+            
+            function findModel(substring) {
+                for (var i = 0; i < models.length; i++) {
+                    if (models[i].name && models[i].name.indexOf(substring) !== -1) {
+                        return models[i];
+                    }
+                }
+                return {};
+            }
+            
+            // 1. Claude / OpenAI Models (use Opus status)
+            var opus = findModel("Claude Opus") || findModel("Claude Sonnet") || findModel("GPT-OSS");
+            
+            // 2. Gemini 3 Pro (High)
+            var geminiPro = findModel("Gemini 3 Pro (High)");
+            
+            // 3. Gemini 3 Flash
+            var geminiFlash = findModel("Gemini 3 Flash");
+            
+            // 4. Gemini 3 Pro Image
+            var geminiImage = findModel("Gemini 3 Pro Image");
             
             return {
                 provider: "antigravity",
                 name: "Antigravity",
                 icon: "antigravity.svg",
-                // Models provide 'remaining', convert to 'used' for standard bar
-                bucket1Name: bucket1.name || "Model 1",
-                bucket1Percent: bucket1.remaining !== undefined ? (100 - bucket1.remaining) : 0,
+                
+                bucket1Name: "Claude / OpenAI",
+                bucket1Percent: opus.remaining !== undefined ? opus.remaining : 0,
                 bucket1Used: "N/A",
                 bucket1Limit: "N/A",
                 
-                bucket2Name: bucket2.name || "Model 2",
-                bucket2Percent: bucket2.remaining !== undefined ? (100 - bucket2.remaining) : 0,
+                bucket2Name: "Gemini 3 Pro",
+                bucket2Percent: geminiPro.remaining !== undefined ? geminiPro.remaining : 0,
                 bucket2Used: "N/A",
                 bucket2Limit: "N/A",
                 
-                bucket3Name: bucket3.name || "Model 3",
-                bucket3Percent: bucket3.remaining !== undefined ? (100 - bucket3.remaining) : 0,
+                bucket3Name: "Gemini 3 Flash",
+                bucket3Percent: geminiFlash.remaining !== undefined ? geminiFlash.remaining : 0,
                 bucket3Used: "N/A",
                 bucket3Limit: "N/A",
                 
+                bucket4Name: "Gemini 3 Pro Image",
+                bucket4Percent: geminiImage.remaining !== undefined ? geminiImage.remaining : 0,
+                bucket4Used: "N/A",
+                bucket4Limit: "N/A",
+                
+                isRemaining: true, // Signal to UI to treat as remaining
                 valid: true
             };
         }
@@ -89,6 +113,7 @@ function parseAntigravityConfig(stdout) {
             bucket3Used: b3Used,
             bucket3Limit: b3Limit,
             bucket3Percent: b3Limit > 0 ? (b3Used / b3Limit * 100) : 0,
+            isRemaining: false,
             valid: true
         };
     } catch (e) {

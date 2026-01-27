@@ -370,17 +370,31 @@ PlasmoidItem {
                         UsageBar {
                             label: model.bucket1Name || "Small"
                             value: model.bucket1Percent || 0
-                            subtext: (model.bucket1Used || 0) + "/" + (model.bucket1Limit || 0)
+                            customColor: (model.isRemaining && model.bucket1Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket1Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining ? Kirigami.Theme.negativeTextColor : "transparent"))
+                            subtext: (model.bucket1Limit === "N/A") ? Math.round(model.bucket1Percent) + "% " + i18n.tr("remaining") : ((model.bucket1Used || 0) + "/" + (model.bucket1Limit || 0))
+                            tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
                         }
                         UsageBar {
                             label: model.bucket2Name || "Medium"
                             value: model.bucket2Percent || 0
-                            subtext: (model.bucket2Limit === "N/A") ? "" : ((model.bucket2Used || 0) + "/" + (model.bucket2Limit || 0))
+                            customColor: (model.isRemaining && model.bucket2Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket2Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining ? Kirigami.Theme.negativeTextColor : "transparent"))
+                            subtext: (model.bucket2Limit === "N/A") ? Math.round(model.bucket2Percent) + "% " + i18n.tr("remaining") : ((model.bucket2Used || 0) + "/" + (model.bucket2Limit || 0))
+                            tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
                         }
                         UsageBar {
                             label: model.bucket3Name || "Large"
                             value: model.bucket3Percent || 0
-                            subtext: (model.bucket3Limit === "N/A") ? "" : ((model.bucket3Used || 0) + "/" + (model.bucket3Limit || 0))
+                            customColor: (model.isRemaining && model.bucket3Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket3Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining ? Kirigami.Theme.negativeTextColor : "transparent"))
+                            subtext: (model.bucket3Limit === "N/A") ? Math.round(model.bucket3Percent) + "% " + i18n.tr("remaining") : ((model.bucket3Used || 0) + "/" + (model.bucket3Limit || 0))
+                            tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
+                        }
+                        UsageBar {
+                            visible: model.bucket4Name !== undefined
+                            label: model.bucket4Name || "Image"
+                            value: model.bucket4Percent || 0
+                            customColor: (model.isRemaining && model.bucket4Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket4Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining ? Kirigami.Theme.negativeTextColor : "transparent"))
+                            subtext: (model.bucket4Limit === "N/A") ? Math.round(model.bucket4Percent) + "% " + i18n.tr("remaining") : ((model.bucket4Used || 0) + "/" + (model.bucket4Limit || 0))
+                            tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
                         }
                     }
 
