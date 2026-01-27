@@ -91,11 +91,14 @@ PlasmoidItem {
         // Read all config files separated by a delimiter
         // Try 'amp usage' command first, then fallback to JSON file
         // Try 'python3 contents/ui/antigravity.py' for Antigravity, fallback to JSON
+        var pyScript = Qt.resolvedUrl("antigravity.py").replace("file://", "")
         var cmd = "cat $HOME/.claude/.credentials.json 2>/dev/null; " + 
                   "echo '___SEP___'; " +
-                  "(python3 " + Qt.resolvedUrl("antigravity.py").replace("file://", "") + " 2>/dev/null || cat $HOME/.antigravity/usage.json 2>/dev/null); " + 
+                  "(python3 \"" + pyScript + "\" 2>/dev/null || cat $HOME/.antigravity/usage.json 2>/dev/null); " + 
                   "echo '___SEP___'; " +
-                  "(amp usage 2>/dev/null || cat $HOME/.amp/usage.json 2>/dev/null)"
+                  "(amp usage 2>/dev/null || ~/.amp/bin/amp usage 2>/dev/null || cat $HOME/.amp/usage.json 2>/dev/null)"
+        
+        console.log("AI Usage Command:", cmd)
         fileReader.connectSource(cmd)
     }
 
