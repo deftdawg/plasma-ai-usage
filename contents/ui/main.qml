@@ -93,9 +93,9 @@ PlasmoidItem {
         // Try 'python3 contents/ui/antigravity.py' for Antigravity, fallback to JSON
         var pyScript = Qt.resolvedUrl("antigravity.py").toString().replace("file://", "")
         var cmd = "cat $HOME/.claude/.credentials.json 2>/dev/null; " + 
-                  "echo '___SEP___'; " +
+                  "echo '___SEP___'; " + 
                   "(python3 \"" + pyScript + "\" 2>/dev/null || cat $HOME/.antigravity/usage.json 2>/dev/null); " + 
-                  "echo '___SEP___'; " +
+                  "echo '___SEP___'; " + 
                   "(amp usage 2>/dev/null || ~/.amp/bin/amp usage 2>/dev/null || cat $HOME/.amp/usage.json 2>/dev/null)"
         
         console.log("AI Usage Command:", cmd)
@@ -153,6 +153,25 @@ PlasmoidItem {
         loadCredentials()
     }
 
+    function getProviderTooltipText(provider) {
+        if (!provider) return ""
+        
+        if (provider.provider === "amp") {
+            return getAmpTooltipText(provider)
+        }
+        
+        if (provider.provider === "antigravity") {
+            var p1 = Math.round(provider.bucket1Percent || 0)
+            var p2 = Math.round(provider.bucket2Percent || 0)
+            var p3 = Math.round(provider.bucket3Percent || 0)
+            var debug = " [Raw: " + provider.bucket1Percent + ", " + provider.bucket2Percent + ", " + provider.bucket3Percent + " | isRem: " + provider.isRemaining + "]"
+            return provider.bucket1Name + ": " + p1 + "% | " + provider.bucket2Name + ": " + p2 + "% | " + provider.bucket3Name + ": " + p3 + "%" + debug
+        }
+        
+        // Claude fallback
+        return i18n.tr("Session (5hr)") + ": " + Math.round(provider.sessionUsage||0) + "% | " + i18n.tr("Weekly (7day)") + ": " + Math.round(provider.weeklyUsage||0) + "%"
+    }
+
     function getAmpTooltipText(provider) {
         if (!provider) return ""
         var remainingPercent = provider.freeLimit > 0 ? ((provider.freeLimit - provider.freeUsed) / provider.freeLimit * 100) : 0
@@ -177,6 +196,16 @@ PlasmoidItem {
             id: compactMouseArea
             anchors.fill: parent
             onClicked: root.expanded = !root.expanded
+            hoverEnabled: true
+            
+            PlasmaComponents.ToolTip.visible: containsMouse
+            PlasmaComponents.ToolTip.text: {
+                var p = usageRow.firstProvider
+                if (p) {
+                    return getProviderTooltipText(p)
+                }
+                return root.toolTipSubText
+            }
         }
 
         RowLayout {
@@ -557,13 +586,8 @@ PlasmoidItem {
     toolTipSubText: {
         if (providersModel.count > 0) {
             var p = providersModel.get(0)
-            if (p.provider === "amp") {
-                return getAmpTooltipText(p)
-            } else if (p.provider === "antigravity") {
-                return p.bucket1Name + ": " + Math.round(p.bucket1Percent||0) + "%"
-            } else {
-                // Claude fallback
-                return i18n.tr("Session (5hr)") + ": " + Math.round(p.sessionUsage||0) + "% | " + i18n.tr("Weekly (7day)") + ": " + Math.round(p.weeklyUsage||0) + "%"
+            if (p) {
+                return getProviderTooltipText(p)
             }
         }
         return ""
