@@ -374,7 +374,7 @@ PlasmoidItem {
                         UsageBar {
                             label: i18n.tr("Free Quota")
                             value: model.freePercent || 0
-                            valueText: "$" + (model.freeUsed || 0).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
+                            valueText: "$" + (model.freeLimit - model.freeUsed).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
                             subtext: model.freeResets ? i18n.tr("Replenishes:") + " " + model.freeResets : ""
                         }
                         
