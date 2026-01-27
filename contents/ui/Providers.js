@@ -35,10 +35,15 @@ function parseAntigravityConfig(stdout) {
         // Handle new format from antigravity.py
         if (data.models) {
             var models = data.models || [];
+            console.log("Antigravity Models found:", models.length);
+            for (var m = 0; m < models.length; m++) {
+                console.log(" - " + models[m].name + ": " + models[m].remaining + "%");
+            }
             
             function findModel(substring) {
+                var lowerSub = substring.toLowerCase();
                 for (var i = 0; i < models.length; i++) {
-                    if (models[i].name && models[i].name.indexOf(substring) !== -1) {
+                    if (models[i].name && models[i].name.toLowerCase().indexOf(lowerSub) !== -1) {
                         return models[i];
                     }
                 }
@@ -46,7 +51,7 @@ function parseAntigravityConfig(stdout) {
             }
             
             // 1. Claude / OpenAI Models (use Opus status)
-            var opus = findModel("Claude Opus") || findModel("Claude Sonnet") || findModel("GPT-OSS") || {};
+            var opus = findModel("Opus") || findModel("Sonnet") || findModel("GPT-OSS") || {};
             
             // 2. Gemini 3 Pro (High)
             var geminiPro = findModel("Gemini 3 Pro (High)") || {};
