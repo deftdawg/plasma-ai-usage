@@ -62,16 +62,16 @@ PlasmoidItem {
                 fetchClaudeUsage()
             }
 
-            // Process Antigravity
-            var antigravityProv = Providers.parseAntigravityConfig(antigravityData)
-            if (antigravityProv) {
-                providersModel.append(antigravityProv)
-            }
-
             // Process Amp
             var ampProv = Providers.parseAmpConfig(ampData)
             if (ampProv) {
                 providersModel.append(ampProv)
+            }
+
+            // Process Antigravity
+            var antigravityProv = Providers.parseAntigravityConfig(antigravityData)
+            if (antigravityProv) {
+                providersModel.append(antigravityProv)
             }
             
             if (providersModel.count === 0) {
@@ -389,7 +389,7 @@ PlasmoidItem {
                             tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
                         }
                         UsageBar {
-                            visible: model.bucket4Name !== undefined
+                            visible: false // Hidden for now
                             label: model.bucket4Name || "Image"
                             value: model.bucket4Percent || 0
                             customColor: (model.isRemaining && model.bucket4Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket4Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining ? Kirigami.Theme.negativeTextColor : "transparent"))

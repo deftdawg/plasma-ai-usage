@@ -52,9 +52,6 @@ function parseAntigravityConfig(stdout) {
             // 3. Gemini 3 Flash
             var geminiFlash = findModel("Gemini 3 Flash");
             
-            // 4. Gemini 3 Pro Image
-            var geminiImage = findModel("Gemini 3 Pro Image");
-            
             return {
                 provider: "antigravity",
                 name: "Antigravity",
@@ -74,11 +71,6 @@ function parseAntigravityConfig(stdout) {
                 bucket3Percent: geminiFlash.remaining !== undefined ? geminiFlash.remaining : 0,
                 bucket3Used: "N/A",
                 bucket3Limit: "N/A",
-                
-                bucket4Name: "Gemini 3 Pro Image",
-                bucket4Percent: geminiImage.remaining !== undefined ? geminiImage.remaining : 0,
-                bucket4Used: "N/A",
-                bucket4Limit: "N/A",
                 
                 isRemaining: true, // Signal to UI to treat as remaining
                 valid: true
