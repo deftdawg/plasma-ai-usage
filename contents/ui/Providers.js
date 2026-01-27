@@ -45,6 +45,7 @@ function parseAntigravityConfig(stdout) {
         return {
             provider: "antigravity",
             name: "Antigravity",
+            icon: "widget.svg",
             bucket1Name: bucket1.name || "Small",
             bucket1Used: b1Used,
             bucket1Limit: b1Limit,
@@ -85,6 +86,7 @@ function parseAmpConfig(stdout) {
         return {
             provider: "amp",
             name: "Amp",
+            icon: "amp.svg",
             freeUsed: freeUsed,
             freeLimit: freeLimit,
             freePercent: freeLimit > 0 ? (freeUsed / freeLimit * 100) : 0,
@@ -104,6 +106,7 @@ function parseAmpUsageText(text) {
         var result = {
             provider: "amp",
             name: "Amp",
+            icon: "amp.svg",
             freeUsed: 0,
             freeLimit: 0,
             freePercent: 0,

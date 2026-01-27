@@ -256,6 +256,14 @@ PlasmoidItem {
                     // Provider Header
                     RowLayout {
                         Layout.fillWidth: true
+                        
+                        Kirigami.Icon {
+                            Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                            Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                            source: model.icon ? Qt.resolvedUrl("../icons/" + model.icon) : ""
+                            visible: model.icon !== undefined
+                        }
+                        
                         PlasmaComponents.Label {
                             text: model.name
                             font.bold: true
