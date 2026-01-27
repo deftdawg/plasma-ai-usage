@@ -385,7 +385,7 @@ PlasmoidItem {
                                     var hours = model.freeUsed / model.rechargeRate;
                                     var target = new Date(new Date().getTime() + hours * 3600000);
                                     var timeStr = Qt.formatTime(target, "h:mm ap").toLowerCase();
-                                    return base + " (" + i18n.tr("spent") + " $" + model.freeUsed.toFixed(2) + "/$" + model.rechargeRate.toFixed(2) + "/h -> " + Math.round(hours) + "h -> ~" + timeStr + ")";
+                                    return base + " (" + i18n.tr("used") + " $" + model.freeUsed.toFixed(2) + "/$" + model.rechargeRate.toFixed(2) + "/h -> " + Math.round(hours) + "h -> ~" + timeStr + ")";
                                 }
                                 return base;
                             }
