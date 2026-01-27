@@ -149,6 +149,20 @@ PlasmoidItem {
         loadCredentials()
     }
 
+    function getAmpTooltipText(provider) {
+        if (!provider) return ""
+        var remainingPercent = provider.freeLimit > 0 ? ((provider.freeLimit - provider.freeUsed) / provider.freeLimit * 100) : 0
+        var base = Math.round(remainingPercent) + "% " + i18n.tr("remaining")
+        
+        if (provider.rechargeRate > 0 && provider.freeUsed > 0) {
+            var hours = provider.freeUsed / provider.rechargeRate
+            var target = new Date(new Date().getTime() + hours * 3600000)
+            var timeStr = Qt.formatTime(target, "h:mm ap").toLowerCase()
+            return base + " (" + i18n.tr("used") + " $" + provider.freeUsed.toFixed(2) + "/$" + provider.rechargeRate.toFixed(2) + "/h -> " + Math.round(hours) + "h -> ~" + timeStr + ")"
+        }
+        return base
+    }
+
     // Compact representation (panel)
     compactRepresentation: Item {
         Layout.minimumWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
@@ -156,8 +170,19 @@ PlasmoidItem {
         Layout.preferredWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
 
         MouseArea {
+            id: compactMouseArea
             anchors.fill: parent
             onClicked: root.expanded = !root.expanded
+            hoverEnabled: true
+        }
+        
+        PlasmaComponents.ToolTip.visible: compactMouseArea.containsMouse
+        PlasmaComponents.ToolTip.text: {
+            var p = usageRow.firstProvider
+            if (p && p.provider === "amp") {
+                return getAmpTooltipText(p)
+            }
+            return root.toolTipSubText
         }
 
         RowLayout {
@@ -379,16 +404,7 @@ PlasmoidItem {
                             customColor: remainingPercent > 50 ? Kirigami.Theme.positiveTextColor : (remainingPercent > 20 ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.negativeTextColor)
                             subtext: model.freeResets ? i18n.tr("Replenishes:") + " " + model.freeResets : ""
                             
-                            tooltipText: {
-                                var base = Math.round(remainingPercent) + "% " + i18n.tr("remaining");
-                                if (model.rechargeRate > 0 && model.freeUsed > 0) {
-                                    var hours = model.freeUsed / model.rechargeRate;
-                                    var target = new Date(new Date().getTime() + hours * 3600000);
-                                    var timeStr = Qt.formatTime(target, "h:mm ap").toLowerCase();
-                                    return base + " (" + i18n.tr("used") + " $" + model.freeUsed.toFixed(2) + "/$" + model.rechargeRate.toFixed(2) + "/h -> " + Math.round(hours) + "h -> ~" + timeStr + ")";
-                                }
-                                return base;
-                            }
+                            tooltipText: getAmpTooltipText(model)
                         }
                         
                         RowLayout {
