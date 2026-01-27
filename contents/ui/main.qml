@@ -224,6 +224,7 @@ PlasmoidItem {
 
                     property bool isAmp: model.provider === "amp"
                     property bool isAntigravity: model.provider === "antigravity"
+                    property bool isRemainingMode: model.isRemaining === true
                     
                     property real displayValue: {
                         if (isAmp) {
@@ -250,7 +251,7 @@ PlasmoidItem {
                                 return Kirigami.Theme.neutralTextColor
                             }
                         }
-                        if (isAntigravity && model.isRemaining) {
+                        if (isAntigravity && isRemainingMode) {
                              if (displayValue > 50) return Kirigami.Theme.positiveTextColor
                              if (displayValue > 20) return Kirigami.Theme.neutralTextColor
                              return Kirigami.Theme.negativeTextColor
@@ -260,7 +261,7 @@ PlasmoidItem {
                     
                     // Dot for non-Amp (Claude/Antigravity legacy)
                     Rectangle {
-                        visible: !isAmp && !(isAntigravity && model.isRemaining)
+                        visible: !parent.isAmp && !(parent.isAntigravity && parent.isRemainingMode)
                         Layout.preferredWidth: 10
                         Layout.preferredHeight: 10
                         radius: 5
@@ -269,7 +270,7 @@ PlasmoidItem {
                     
                     PlasmaComponents.Label {
                         text: parent.displayText
-                        color: (isAmp || (isAntigravity && model.isRemaining)) ? parent.displayColor : Kirigami.Theme.textColor
+                        color: (parent.isAmp || (parent.isAntigravity && parent.isRemainingMode)) ? parent.displayColor : Kirigami.Theme.textColor
                         font.bold: true
                     }
                 }

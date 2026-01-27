@@ -15,8 +15,10 @@ function parseClaudeCredentials(stdout) {
         return {
             provider: "claude",
             name: "Claude",
+            icon: "claude.svg",
             token: oauth.accessToken,
             plan: planMap[tier] || tier,
+            isRemaining: false,
             valid: true
         };
     } catch (e) {
@@ -40,17 +42,17 @@ function parseAntigravityConfig(stdout) {
                         return models[i];
                     }
                 }
-                return {};
+                return null;
             }
             
             // 1. Claude / OpenAI Models (use Opus status)
-            var opus = findModel("Claude Opus") || findModel("Claude Sonnet") || findModel("GPT-OSS");
+            var opus = findModel("Claude Opus") || findModel("Claude Sonnet") || findModel("GPT-OSS") || {};
             
             // 2. Gemini 3 Pro (High)
-            var geminiPro = findModel("Gemini 3 Pro (High)");
+            var geminiPro = findModel("Gemini 3 Pro (High)") || {};
             
             // 3. Gemini 3 Flash
-            var geminiFlash = findModel("Gemini 3 Flash");
+            var geminiFlash = findModel("Gemini 3 Flash") || {};
             
             return {
                 provider: "antigravity",
@@ -141,6 +143,7 @@ function parseAmpConfig(stdout) {
             freeResets: freeQuota.resets_at || "",
             creditBalance: credits.balance || 0.00,
             creditCurrency: credits.currency || "USD",
+            isRemaining: true,
             valid: true
         };
     } catch (e) {
@@ -161,6 +164,7 @@ function parseAmpUsageText(text) {
             freeResets: "",
             creditBalance: 0,
             creditCurrency: "USD",
+            isRemaining: true,
             valid: true
         };
 
