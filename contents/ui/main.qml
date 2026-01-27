@@ -169,9 +169,9 @@ PlasmoidItem {
 
     // Compact representation (panel)
     compactRepresentation: Item {
-        Layout.minimumWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
+        Layout.minimumWidth: compactRow.implicitWidth + Kirigami.Units.largeSpacing * 2
         Layout.minimumHeight: Kirigami.Units.iconSizes.medium
-        Layout.preferredWidth: usageRow.implicitWidth + Kirigami.Units.largeSpacing * 2
+        Layout.preferredWidth: compactRow.implicitWidth + Kirigami.Units.largeSpacing * 2
 
         MouseArea {
             id: compactMouseArea
@@ -180,75 +180,98 @@ PlasmoidItem {
         }
 
         RowLayout {
-            id: usageRow
+            id: compactRow
             anchors.centerIn: parent
             spacing: Kirigami.Units.smallSpacing
 
-            property var firstProvider: providersModel.count > 0 ? providersModel.get(0) : null
-
-            Kirigami.Icon {
-                Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
-                Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
-                source: parent.firstProvider && parent.firstProvider.icon ? Qt.resolvedUrl("../icons/" + parent.firstProvider.icon) : Qt.resolvedUrl("../icons/claude.svg")
-            }
-
-            // Show summary of first provider or error
-            PlasmaComponents.Label {
-                visible: root.errorMsg !== ""
-                text: "⚠"
-                color: Kirigami.Theme.negativeTextColor
-            }
-
-            // If we have providers, show the first one's primary stat
+            // Empty/Error State
             RowLayout {
-                visible: root.errorMsg === "" && providersModel.count > 0
+                visible: providersModel.count === 0
                 spacing: Kirigami.Units.smallSpacing
                 
-                property var provider: usageRow.firstProvider
-                property bool isAmp: provider && provider.provider === "amp"
-                
-                property real displayValue: {
-                    if (!provider) return 0
-                    if (isAmp) {
-                        if (provider.freeLimit > 0 && provider.freeUsed < provider.freeLimit) {
-                            return Math.floor(provider.freeLimit - provider.freeUsed)
-                        } else {
-                            return Math.floor(provider.creditBalance || 0)
-                        }
-                    }
-                    if (provider.provider === "claude") return provider.sessionUsage || 0
-                    if (provider.provider === "antigravity") return provider.bucket1Percent || 0
-                    return 0
-                }
-                
-                property string displayText: {
-                    if (isAmp) return "$" + displayValue
-                    return Math.round(displayValue) + "%"
-                }
-                
-                property color displayColor: {
-                    if (isAmp) {
-                        if (provider.freeLimit > 0 && provider.freeUsed < provider.freeLimit) {
-                            return Kirigami.Theme.positiveTextColor // Green for free credit
-                        } else {
-                            return Kirigami.Theme.neutralTextColor // Yellow for paid credit
-                        }
-                    }
-                    return getUsageColor(displayValue)
-                }
-                
-                Rectangle {
-                    visible: !parent.isAmp
-                    Layout.preferredWidth: 10
-                    Layout.preferredHeight: 10
-                    radius: 5
-                    color: parent.displayColor
+                Kirigami.Icon {
+                    Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                    source: Qt.resolvedUrl("../icons/claude.svg")
                 }
                 
                 PlasmaComponents.Label {
-                    text: parent.displayText
-                    color: parent.isAmp ? parent.displayColor : Kirigami.Theme.textColor
-                    font.bold: true
+                    visible: root.errorMsg !== ""
+                    text: "⚠"
+                    color: Kirigami.Theme.negativeTextColor
+                }
+            }
+
+            // Providers List
+            Repeater {
+                model: providersModel
+                delegate: RowLayout {
+                    spacing: Kirigami.Units.smallSpacing
+                    
+                    // Separator
+                    PlasmaComponents.Label {
+                        visible: index > 0
+                        text: "|"
+                        opacity: 0.5
+                        color: Kirigami.Theme.disabledTextColor
+                    }
+
+                    Kirigami.Icon {
+                        Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+                        Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                        source: model.icon ? Qt.resolvedUrl("../icons/" + model.icon) : ""
+                    }
+
+                    property bool isAmp: model.provider === "amp"
+                    property bool isAntigravity: model.provider === "antigravity"
+                    
+                    property real displayValue: {
+                        if (isAmp) {
+                            if (model.freeLimit > 0 && model.freeUsed < model.freeLimit) {
+                                return Math.floor(model.freeLimit - model.freeUsed)
+                            } else {
+                                return Math.floor(model.creditBalance || 0)
+                            }
+                        }
+                        if (isAntigravity) return model.bucket1Percent || 0
+                        return model.sessionUsage || 0
+                    }
+                    
+                    property string displayText: {
+                        if (isAmp) return "$" + displayValue
+                        return Math.round(displayValue) + "%"
+                    }
+                    
+                    property color displayColor: {
+                        if (isAmp) {
+                            if (model.freeLimit > 0 && model.freeUsed < model.freeLimit) {
+                                return Kirigami.Theme.positiveTextColor
+                            } else {
+                                return Kirigami.Theme.neutralTextColor
+                            }
+                        }
+                        if (isAntigravity && model.isRemaining) {
+                             if (displayValue > 50) return Kirigami.Theme.positiveTextColor
+                             if (displayValue > 20) return Kirigami.Theme.neutralTextColor
+                             return Kirigami.Theme.negativeTextColor
+                        }
+                        return getUsageColor(displayValue)
+                    }
+                    
+                    // Dot for non-Amp (Claude/Antigravity legacy)
+                    Rectangle {
+                        visible: !isAmp && !(isAntigravity && model.isRemaining)
+                        Layout.preferredWidth: 10
+                        Layout.preferredHeight: 10
+                        radius: 5
+                        color: parent.displayColor
+                    }
+                    
+                    PlasmaComponents.Label {
+                        text: parent.displayText
+                        color: (isAmp || (isAntigravity && model.isRemaining)) ? parent.displayColor : Kirigami.Theme.textColor
+                        font.bold: true
+                    }
                 }
             }
         }
