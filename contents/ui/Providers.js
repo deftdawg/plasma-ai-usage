@@ -45,7 +45,7 @@ function parseAntigravityConfig(stdout) {
         return {
             provider: "antigravity",
             name: "Antigravity",
-            icon: "widget.svg",
+            icon: "antigravity.svg",
             bucket1Name: bucket1.name || "Small",
             bucket1Used: b1Used,
             bucket1Limit: b1Limit,
