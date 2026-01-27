@@ -46,7 +46,8 @@ QtObject {
             "Credit Balance:": "Credit Balance:",
             "Replenishes:": "Replenishes:",
             "remaining": "remaining",
-            "used": "used"
+            "used": "used",
+            "spent": "spent"
         },
         "hu_HU": {
             "Claude Usage": "Claude használat",

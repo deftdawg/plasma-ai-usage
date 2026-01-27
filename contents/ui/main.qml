@@ -378,7 +378,17 @@ PlasmoidItem {
                             valueText: "$" + (model.freeLimit - model.freeUsed).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
                             customColor: remainingPercent > 50 ? Kirigami.Theme.positiveTextColor : (remainingPercent > 20 ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.negativeTextColor)
                             subtext: model.freeResets ? i18n.tr("Replenishes:") + " " + model.freeResets : ""
-                            tooltipSuffix: i18n.tr("remaining")
+                            
+                            tooltipText: {
+                                var base = Math.round(remainingPercent) + "% " + i18n.tr("remaining");
+                                if (model.rechargeRate > 0 && model.freeUsed > 0) {
+                                    var hours = model.freeUsed / model.rechargeRate;
+                                    var target = new Date(new Date().getTime() + hours * 3600000);
+                                    var timeStr = Qt.formatTime(target, "h:mm ap").toLowerCase();
+                                    return base + " (" + i18n.tr("spent") + " $" + model.freeUsed.toFixed(2) + "/$" + model.rechargeRate.toFixed(2) + "/h -> " + Math.round(hours) + "h -> ~" + timeStr + ")";
+                                }
+                                return base;
+                            }
                         }
                         
                         RowLayout {
@@ -422,6 +432,7 @@ PlasmoidItem {
         property string valueText: Math.round(value) + "%"
         property color customColor: "transparent"
         property string tooltipSuffix: i18n.tr("used")
+        property string tooltipText: Math.round(value) + "% " + tooltipSuffix
         
         Layout.fillWidth: true
         implicitHeight: mainLayout.implicitHeight
@@ -466,11 +477,13 @@ PlasmoidItem {
         }
         
         MouseArea {
+            id: hoverArea
             anchors.fill: parent
             hoverEnabled: true
-            PlasmaComponents.ToolTip.visible: containsMouse
-            PlasmaComponents.ToolTip.text: Math.round(parent.value) + "% " + parent.tooltipSuffix
         }
+        
+        PlasmaComponents.ToolTip.visible: hoverArea.containsMouse
+        PlasmaComponents.ToolTip.text: tooltipText
     }
 
     Timer {

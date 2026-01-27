@@ -130,6 +130,11 @@ function parseAmpUsageText(text) {
         var resetMatch = text.match(/\(replenishes ([^)]+)\)/);
         if (resetMatch) {
             result.freeResets = resetMatch[1];
+            // Extract numeric rate (e.g. +$0.83/hour -> 0.83)
+            var rateMatch = resetMatch[1].match(/\+\$([0-9.]+)\/hour/);
+            if (rateMatch) {
+                result.rechargeRate = parseFloat(rateMatch[1]);
+            }
         }
 
         // Parse Individual credits: $77.57 remaining
