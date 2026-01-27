@@ -173,16 +173,6 @@ PlasmoidItem {
             id: compactMouseArea
             anchors.fill: parent
             onClicked: root.expanded = !root.expanded
-            hoverEnabled: true
-            
-            PlasmaComponents.ToolTip.visible: containsMouse
-            PlasmaComponents.ToolTip.text: {
-                var p = usageRow.firstProvider
-                if (p && p.provider === "amp") {
-                    return getAmpTooltipText(p)
-                }
-                return root.toolTipSubText
-            }
         }
 
         RowLayout {
@@ -522,4 +512,18 @@ PlasmoidItem {
 
     Plasmoid.icon: "claude-usage"
     toolTipMainText: i18n.tr("AI Usage")
+    toolTipSubText: {
+        if (providersModel.count > 0) {
+            var p = providersModel.get(0)
+            if (p.provider === "amp") {
+                return getAmpTooltipText(p)
+            } else if (p.provider === "antigravity") {
+                return p.bucket1Name + ": " + Math.round(p.bucket1Percent||0) + "%"
+            } else {
+                // Claude fallback
+                return i18n.tr("Session (5hr)") + ": " + Math.round(p.sessionUsage||0) + "% | " + i18n.tr("Weekly (7day)") + ": " + Math.round(p.weeklyUsage||0) + "%"
+            }
+        }
+        return ""
+    }
 }
