@@ -373,8 +373,10 @@ PlasmoidItem {
 
                         UsageBar {
                             label: i18n.tr("Free Quota")
-                            value: model.freePercent || 0
+                            property real remainingPercent: model.freeLimit > 0 ? ((model.freeLimit - model.freeUsed) / model.freeLimit * 100) : 0
+                            value: remainingPercent
                             valueText: "$" + (model.freeLimit - model.freeUsed).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
+                            customColor: remainingPercent > 50 ? Kirigami.Theme.positiveTextColor : (remainingPercent > 20 ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.negativeTextColor)
                             subtext: model.freeResets ? i18n.tr("Replenishes:") + " " + model.freeResets : ""
                         }
                         
@@ -417,6 +419,9 @@ PlasmoidItem {
         property real value
         property string subtext
         property string valueText: Math.round(value) + "%"
+        property color customColor: "transparent"
+        
+        readonly property color effectiveColor: customColor != "transparent" ? customColor : getUsageColor(value)
         
         spacing: 2
         Layout.fillWidth: true
@@ -427,7 +432,7 @@ PlasmoidItem {
             Item { Layout.fillWidth: true }
             PlasmaComponents.Label { 
                 text: valueText
-                color: getUsageColor(value)
+                color: effectiveColor
                 font.bold: true
             }
         }
@@ -442,7 +447,7 @@ PlasmoidItem {
                 width: parent.width * Math.min(value / 100, 1)
                 height: parent.height
                 radius: 4
-                color: getUsageColor(value)
+                color: effectiveColor
             }
         }
         PlasmaComponents.Label {
