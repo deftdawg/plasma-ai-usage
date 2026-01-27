@@ -337,7 +337,7 @@ PlasmoidItem {
                         UsageBar {
                             label: i18n.tr("Free Quota")
                             value: model.freePercent || 0
-                            subtext: (model.freeUsed || 0) + "/" + (model.freeLimit || 0)
+                            subtext: "$" + (model.freeUsed || 0).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
                         }
                         
                         RowLayout {
@@ -347,7 +347,7 @@ PlasmoidItem {
                             }
                             Item { Layout.fillWidth: true }
                             PlasmaComponents.Label {
-                                text: (model.creditBalance || 0).toFixed(2) + " " + (model.creditCurrency || "USD")
+                                text: "$" + (model.creditBalance || 0).toFixed(2)
                                 font.bold: true
                             }
                         }
