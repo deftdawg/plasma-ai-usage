@@ -425,14 +425,6 @@ PlasmoidItem {
         
         spacing: 2
         Layout.fillWidth: true
-
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            PlasmaComponents.ToolTip {
-                text: Math.round(parent.parent.value) + "% " + i18n.tr("remaining")
-            }
-        }
         
         RowLayout {
             Layout.fillWidth: true
