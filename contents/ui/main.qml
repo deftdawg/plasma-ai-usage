@@ -378,6 +378,7 @@ PlasmoidItem {
                             valueText: "$" + (model.freeLimit - model.freeUsed).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
                             customColor: remainingPercent > 50 ? Kirigami.Theme.positiveTextColor : (remainingPercent > 20 ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.negativeTextColor)
                             subtext: model.freeResets ? i18n.tr("Replenishes:") + " " + model.freeResets : ""
+                            tooltipSuffix: i18n.tr("remaining")
                         }
                         
                         RowLayout {
@@ -414,47 +415,61 @@ PlasmoidItem {
     }
     
     // Reusable Usage Bar Component
-    component UsageBar : ColumnLayout {
+    component UsageBar : Item {
         property string label
         property real value
         property string subtext
         property string valueText: Math.round(value) + "%"
         property color customColor: "transparent"
+        property string tooltipSuffix: i18n.tr("used")
+        
+        Layout.fillWidth: true
+        implicitHeight: mainLayout.implicitHeight
         
         readonly property color effectiveColor: customColor != "transparent" ? customColor : getUsageColor(value)
         
-        spacing: 2
-        Layout.fillWidth: true
-        
-        RowLayout {
-            Layout.fillWidth: true
-            PlasmaComponents.Label { text: label; font.bold: true }
-            Item { Layout.fillWidth: true }
-            PlasmaComponents.Label { 
-                text: valueText
-                color: effectiveColor
-                font.bold: true
+        ColumnLayout {
+            id: mainLayout
+            anchors.fill: parent
+            spacing: 2
+            
+            RowLayout {
+                Layout.fillWidth: true
+                PlasmaComponents.Label { text: label; font.bold: true }
+                Item { Layout.fillWidth: true }
+                PlasmaComponents.Label { 
+                    text: valueText
+                    color: effectiveColor
+                    font.bold: true
+                }
             }
-        }
-        Rectangle {
-            Layout.fillWidth: true
-            height: 8
-            radius: 4
-            color: Kirigami.Theme.backgroundColor
-            border.color: Kirigami.Theme.disabledTextColor
-            border.width: 1
             Rectangle {
-                width: parent.width * Math.min(value / 100, 1)
-                height: parent.height
+                Layout.fillWidth: true
+                height: 8
                 radius: 4
-                color: effectiveColor
+                color: Kirigami.Theme.backgroundColor
+                border.color: Kirigami.Theme.disabledTextColor
+                border.width: 1
+                Rectangle {
+                    width: parent.width * Math.min(value / 100, 1)
+                    height: parent.height
+                    radius: 4
+                    color: effectiveColor
+                }
+            }
+            PlasmaComponents.Label {
+                visible: subtext !== ""
+                text: subtext
+                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                color: Kirigami.Theme.disabledTextColor
             }
         }
-        PlasmaComponents.Label {
-            visible: subtext !== ""
-            text: subtext
-            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
-            color: Kirigami.Theme.disabledTextColor
+        
+        MouseArea {
+            anchors.fill: parent
+            hoverEnabled: true
+            PlasmaComponents.ToolTip.visible: containsMouse
+            PlasmaComponents.ToolTip.text: Math.round(parent.value) + "% " + parent.tooltipSuffix
         }
     }
 
