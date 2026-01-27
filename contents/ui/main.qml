@@ -192,9 +192,9 @@ PlasmoidItem {
                     if (!provider) return 0
                     if (isAmp) {
                         if (provider.freeLimit > 0 && provider.freeUsed < provider.freeLimit) {
-                            return Math.round(provider.freeLimit - provider.freeUsed)
+                            return Math.floor(provider.freeLimit - provider.freeUsed)
                         } else {
-                            return Math.round(provider.creditBalance || 0)
+                            return Math.floor(provider.creditBalance || 0)
                         }
                     }
                     if (provider.provider === "claude") return provider.sessionUsage || 0
