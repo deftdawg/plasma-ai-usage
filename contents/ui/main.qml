@@ -165,10 +165,12 @@ PlasmoidItem {
             anchors.centerIn: parent
             spacing: Kirigami.Units.smallSpacing
 
+            property var firstProvider: providersModel.count > 0 ? providersModel.get(0) : null
+
             Kirigami.Icon {
                 Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
                 Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
-                source: Qt.resolvedUrl("../icons/claude.svg") // Keep claude icon or make generic
+                source: parent.firstProvider && parent.firstProvider.icon ? Qt.resolvedUrl("../icons/" + parent.firstProvider.icon) : Qt.resolvedUrl("../icons/claude.svg")
             }
 
             // Show summary of first provider or error
@@ -183,23 +185,50 @@ PlasmoidItem {
                 visible: root.errorMsg === "" && providersModel.count > 0
                 spacing: Kirigami.Units.smallSpacing
                 
-                property var firstProvider: providersModel.count > 0 ? providersModel.get(0) : null
-                property real displayUsage: {
-                    if (!firstProvider) return 0
-                    if (firstProvider.provider === "claude") return firstProvider.sessionUsage || 0
-                    if (firstProvider.provider === "antigravity") return firstProvider.bucket1Percent || 0
-                    if (firstProvider.provider === "amp") return firstProvider.freePercent || 0
+                property var provider: usageRow.firstProvider
+                property bool isAmp: provider && provider.provider === "amp"
+                
+                property real displayValue: {
+                    if (!provider) return 0
+                    if (isAmp) {
+                        if (provider.freeLimit > 0 && provider.freeUsed < provider.freeLimit) {
+                            return Math.round(provider.freeLimit - provider.freeUsed)
+                        } else {
+                            return Math.round(provider.creditBalance || 0)
+                        }
+                    }
+                    if (provider.provider === "claude") return provider.sessionUsage || 0
+                    if (provider.provider === "antigravity") return provider.bucket1Percent || 0
                     return 0
                 }
                 
+                property string displayText: {
+                    if (isAmp) return "$" + displayValue
+                    return Math.round(displayValue) + "%"
+                }
+                
+                property color displayColor: {
+                    if (isAmp) {
+                        if (provider.freeLimit > 0 && provider.freeUsed < provider.freeLimit) {
+                            return Kirigami.Theme.positiveTextColor // Green for free credit
+                        } else {
+                            return Kirigami.Theme.neutralTextColor // Yellow for paid credit
+                        }
+                    }
+                    return getUsageColor(displayValue)
+                }
+                
                 Rectangle {
+                    visible: !isAmp
                     Layout.preferredWidth: 10
                     Layout.preferredHeight: 10
                     radius: 5
-                    color: getUsageColor(parent.displayUsage)
+                    color: parent.displayColor
                 }
+                
                 PlasmaComponents.Label {
-                    text: Math.round(parent.displayUsage) + "%"
+                    text: parent.displayText
+                    color: isAmp ? parent.displayColor : Kirigami.Theme.textColor
                     font.bold: true
                 }
             }
