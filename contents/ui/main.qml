@@ -89,7 +89,12 @@ PlasmoidItem {
         root.isLoading = true
         root.errorMsg = ""
         // Read all config files separated by a delimiter
-        var cmd = "cat $HOME/.claude/.credentials.json 2>/dev/null; echo '___SEP___'; cat $HOME/.antigravity/usage.json 2>/dev/null; echo '___SEP___'; cat $HOME/.amp/usage.json 2>/dev/null"
+        // Try 'amp usage' command first, then fallback to JSON file
+        var cmd = "cat $HOME/.claude/.credentials.json 2>/dev/null; " + 
+                  "echo '___SEP___'; " +
+                  "cat $HOME/.antigravity/usage.json 2>/dev/null; " + 
+                  "echo '___SEP___'; " +
+                  "(amp usage 2>/dev/null || cat $HOME/.amp/usage.json 2>/dev/null)"
         fileReader.connectSource(cmd)
     }
 
@@ -178,20 +183,24 @@ PlasmoidItem {
                 visible: root.errorMsg === "" && providersModel.count > 0
                 spacing: Kirigami.Units.smallSpacing
                 
-                Repeater {
-                    model: Math.min(providersModel.count, 1) // Only show first one for now in compact
-                    delegate: RowLayout {
-                        Rectangle {
-                            Layout.preferredWidth: 10
-                            Layout.preferredHeight: 10
-                            radius: 5
-                            color: getUsageColor(model.sessionUsage !== undefined ? model.sessionUsage : (model.free ? (model.free.used / model.free.limit * 100) : 0))
-                        }
-                        PlasmaComponents.Label {
-                            text: (model.sessionUsage !== undefined ? Math.round(model.sessionUsage) : (model.free ? Math.round(model.free.used / model.free.limit * 100) : 0)) + "%"
-                            font.bold: true
-                        }
-                    }
+                property var firstProvider: providersModel.count > 0 ? providersModel.get(0) : null
+                property real displayUsage: {
+                    if (!firstProvider) return 0
+                    if (firstProvider.provider === "claude") return firstProvider.sessionUsage || 0
+                    if (firstProvider.provider === "antigravity") return firstProvider.bucket1Percent || 0
+                    if (firstProvider.provider === "amp") return firstProvider.freePercent || 0
+                    return 0
+                }
+                
+                Rectangle {
+                    Layout.preferredWidth: 10
+                    Layout.preferredHeight: 10
+                    radius: 5
+                    color: getUsageColor(parent.displayUsage)
+                }
+                PlasmaComponents.Label {
+                    text: Math.round(parent.displayUsage) + "%"
+                    font.bold: true
                 }
             }
         }
@@ -302,13 +311,20 @@ PlasmoidItem {
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
                         
-                        Repeater {
-                            model: model.buckets
-                            delegate: UsageBar {
-                                label: modelData.name
-                                value: (modelData.used / modelData.limit) * 100
-                                subtext: modelData.used + "/" + modelData.limit
-                            }
+                        UsageBar {
+                            label: model.bucket1Name || "Small"
+                            value: model.bucket1Percent || 0
+                            subtext: (model.bucket1Used || 0) + "/" + (model.bucket1Limit || 0)
+                        }
+                        UsageBar {
+                            label: model.bucket2Name || "Medium"
+                            value: model.bucket2Percent || 0
+                            subtext: (model.bucket2Used || 0) + "/" + (model.bucket2Limit || 0)
+                        }
+                        UsageBar {
+                            label: model.bucket3Name || "Large"
+                            value: model.bucket3Percent || 0
+                            subtext: (model.bucket3Used || 0) + "/" + (model.bucket3Limit || 0)
                         }
                     }
 
@@ -320,8 +336,8 @@ PlasmoidItem {
 
                         UsageBar {
                             label: i18n.tr("Free Quota")
-                            value: model.free ? (model.free.used / model.free.limit * 100) : 0
-                            subtext: model.free ? (model.free.used + "/" + model.free.limit) : ""
+                            value: model.freePercent || 0
+                            subtext: (model.freeUsed || 0) + "/" + (model.freeLimit || 0)
                         }
                         
                         RowLayout {
@@ -331,7 +347,7 @@ PlasmoidItem {
                             }
                             Item { Layout.fillWidth: true }
                             PlasmaComponents.Label {
-                                text: model.credit ? (model.credit.balance + " " + model.credit.currency) : "0.00"
+                                text: (model.creditBalance || 0).toFixed(2) + " " + (model.creditCurrency || "USD")
                                 font.bold: true
                             }
                         }
