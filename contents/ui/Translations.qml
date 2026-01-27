@@ -43,7 +43,8 @@ QtObject {
             "Refresh interval:": "Refresh interval:",
             "minutes": "minutes",
             "Free Quota": "Free Quota",
-            "Credit Balance:": "Credit Balance:"
+            "Credit Balance:": "Credit Balance:",
+            "Replenishes:": "Replenishes:"
         },
         "hu_HU": {
             "Claude Usage": "Claude használat",

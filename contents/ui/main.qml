@@ -337,7 +337,8 @@ PlasmoidItem {
                         UsageBar {
                             label: i18n.tr("Free Quota")
                             value: model.freePercent || 0
-                            subtext: "$" + (model.freeUsed || 0).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
+                            valueText: "$" + (model.freeUsed || 0).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
+                            subtext: model.freeResets ? i18n.tr("Replenishes:") + " " + model.freeResets : ""
                         }
                         
                         RowLayout {
@@ -378,6 +379,7 @@ PlasmoidItem {
         property string label
         property real value
         property string subtext
+        property string valueText: Math.round(value) + "%"
         
         spacing: 2
         Layout.fillWidth: true
@@ -387,7 +389,7 @@ PlasmoidItem {
             PlasmaComponents.Label { text: label; font.bold: true }
             Item { Layout.fillWidth: true }
             PlasmaComponents.Label { 
-                text: Math.round(value) + "%"
+                text: valueText
                 color: getUsageColor(value)
                 font.bold: true
             }
