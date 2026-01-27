@@ -91,7 +91,7 @@ PlasmoidItem {
         // Read all config files separated by a delimiter
         // Try 'amp usage' command first, then fallback to JSON file
         // Try 'python3 contents/ui/antigravity.py' for Antigravity, fallback to JSON
-        var pyScript = Qt.resolvedUrl("antigravity.py").replace("file://", "")
+        var pyScript = Qt.resolvedUrl("antigravity.py").toString().replace("file://", "")
         var cmd = "cat $HOME/.claude/.credentials.json 2>/dev/null; " + 
                   "echo '___SEP___'; " +
                   "(python3 \"" + pyScript + "\" 2>/dev/null || cat $HOME/.antigravity/usage.json 2>/dev/null); " + 
