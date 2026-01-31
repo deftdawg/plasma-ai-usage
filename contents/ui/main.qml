@@ -96,7 +96,8 @@ PlasmoidItem {
                   "echo '___SEP___'; " + 
                   "(python3 \"" + pyScript + "\" 2>/dev/null || cat $HOME/.antigravity/usage.json 2>/dev/null); " + 
                   "echo '___SEP___'; " + 
-                  "(amp usage 2>/dev/null || ~/.amp/bin/amp usage 2>/dev/null || cat $HOME/.amp/usage.json 2>/dev/null)"
+                  "(amp usage 2>/dev/null || ~/.amp/bin/amp usage 2>/dev/null || cat $HOME/.amp/usage.json 2>/dev/null); " +
+                  "# " + new Date().getTime()
         
         console.log("AI Usage Command:", cmd)
         fileReader.connectSource(cmd)
