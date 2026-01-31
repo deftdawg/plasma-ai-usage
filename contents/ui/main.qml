@@ -71,39 +71,71 @@ PlasmoidItem {
 
             // Process Antigravity
             var antigravityProv = Providers.parseAntigravityConfig(antigravityData)
+            
+            // Helper to get cached data if valid
+            var getCached = function() {
+                if (root.cachedAntigravity && (new Date().getTime() - root.cachedAntigravity.timestamp < 3600000)) {
+                    return root.cachedAntigravity
+                }
+                return null
+            }
+            
             if (antigravityProv) {
                 if (!antigravityProv.error) {
                     // Update cache
                     root.cachedAntigravity = antigravityProv
                     root.cachedAntigravity.timestamp = new Date().getTime()
                 } else {
-                    // Check cache validity (1 hour = 3600000 ms)
-                    if (root.cachedAntigravity && (new Date().getTime() - root.cachedAntigravity.timestamp < 3600000)) {
-                        // Use cached data but flag error state for header
-                        var cached = root.cachedAntigravity
-                        // Clone/Create object with error flag but valid data
-                        antigravityProv = {
-                            provider: cached.provider,
-                            name: cached.name,
-                            icon: cached.icon,
-                            error: antigravityProv.error, // Persist error message
-                            isRemaining: cached.isRemaining,
-                            bucket1Name: cached.bucket1Name,
-                            bucket1Percent: cached.bucket1Percent,
-                            bucket1Reset: cached.bucket1Reset,
-                            bucket2Name: cached.bucket2Name,
-                            bucket2Percent: cached.bucket2Percent,
-                            bucket2Reset: cached.bucket2Reset,
-                            bucket3Name: cached.bucket3Name,
-                            bucket3Percent: cached.bucket3Percent,
-                            bucket3Reset: cached.bucket3Reset,
-                            bucket4Name: cached.bucket4Name,
-                            bucket4Percent: cached.bucket4Percent,
-                            bucket4Reset: cached.bucket4Reset,
-                            valid: true
-                        }
+                    // Error reported by script
+                    var cached = getCached()
+                    if (cached) {
+                        // Use cache but keep error
+                        antigravityProv = Object.assign({}, cached) // Shallow copy
+                        antigravityProv.error = "Not Running"
+                        antigravityProv.timestamp = cached.timestamp // Preserve timestamp
                     }
                 }
+            } else {
+                // Parse failed (e.g. script failed silently)
+                var cached = getCached()
+                if (cached) {
+                    antigravityProv = Object.assign({}, cached)
+                    antigravityProv.error = "Not Running"
+                    antigravityProv.timestamp = cached.timestamp
+                } else {
+                    // No cache, force default error state
+                    antigravityProv = {
+                        provider: "antigravity",
+                        name: "Antigravity",
+                        icon: "antigravity.svg",
+                        error: "Not Running",
+                        valid: true,
+                        isRemaining: true,
+                        bucket1Name: "Claude / OpenAI",
+                        bucket1Percent: -1,
+                        bucket1Used: "N/A",
+                        bucket1Limit: "N/A",
+                        bucket1Reset: "",
+                        bucket2Name: "Gemini 3 Pro",
+                        bucket2Percent: -1,
+                        bucket2Used: "N/A",
+                        bucket2Limit: "N/A",
+                        bucket2Reset: "",
+                        bucket3Name: "Gemini 3 Flash",
+                        bucket3Percent: -1,
+                        bucket3Used: "N/A",
+                        bucket3Limit: "N/A",
+                        bucket3Reset: "",
+                        bucket4Name: "Gemini 3 Pro Image",
+                        bucket4Percent: -1,
+                        bucket4Used: "N/A",
+                        bucket4Limit: "N/A",
+                        bucket4Reset: ""
+                    }
+                }
+            }
+            
+            if (antigravityProv) {
                 providersModel.append(antigravityProv)
             }
             
@@ -417,7 +449,7 @@ PlasmoidItem {
                         
                         // Error message/status next to header
                         PlasmaComponents.Label {
-                            visible: model.error !== undefined
+                            visible: model.provider === "antigravity" && model.error !== undefined
                             text: " (" + i18n.tr("Not Running") + ")"
                             color: Kirigami.Theme.negativeTextColor
                             font.italic: true
