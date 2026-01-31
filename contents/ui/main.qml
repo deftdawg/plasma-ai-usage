@@ -214,16 +214,6 @@ PlasmoidItem {
             id: compactMouseArea
             anchors.fill: parent
             onClicked: root.expanded = !root.expanded
-            hoverEnabled: true
-            
-            PlasmaComponents.ToolTip.visible: containsMouse
-            PlasmaComponents.ToolTip.text: {
-                var p = providersModel.count > 0 ? providersModel.get(0) : null
-                if (p) {
-                    return getProviderTooltipText(p)
-                }
-                return root.toolTipSubText
-            }
         }
 
         RowLayout {
