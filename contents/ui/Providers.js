@@ -120,51 +120,8 @@ function parseAntigravityConfig(stdout) {
             };
         }
 
-        // Fallback to legacy format
-        var bucket1 = data.bucket_small || data.buckets?.[0] || {};
-        var bucket2 = data.bucket_medium || data.buckets?.[1] || {};
-        var bucket3 = data.bucket_large || data.buckets?.[2] || {};
-        
-        var b1Used = bucket1.used || 0;
-        var b1Limit = bucket1.limit || 100;
-        var b2Used = bucket2.used || 0;
-        var b2Limit = bucket2.limit || 100;
-        var b3Used = bucket3.used || 0;
-        var b3Limit = bucket3.limit || 100;
-        
-        return {
-            provider: "antigravity",
-            name: "Antigravity",
-            icon: "antigravity.svg",
-            bucketsJson: makeBucketsJson([
-                {
-                    name: bucket1.name || "Small",
-                    used: b1Used,
-                    limit: b1Limit,
-                    percent: b1Limit > 0 ? (b1Used / b1Limit * 100) : 0,
-                    reset: ""
-                },
-                {
-                    name: bucket2.name || "Medium",
-                    used: b2Used,
-                    limit: b2Limit,
-                    percent: b2Limit > 0 ? (b2Used / b2Limit * 100) : 0,
-                    reset: ""
-                },
-                {
-                    name: bucket3.name || "Large",
-                    used: b3Used,
-                    limit: b3Limit,
-                    percent: b3Limit > 0 ? (b3Used / b3Limit * 100) : 0,
-                    reset: ""
-                }
-            ]),
-            isRemaining: false,
-            valid: true,
-            // These must always be defined for ListModel role consistency
-            error: "",
-            lastCacheTime: ""
-        };
+        // No valid format found
+        return null;
     } catch (e) {
         console.log("Antigravity: Failed to parse config:", e);
         return null;
