@@ -62,9 +62,9 @@ function parseAntigravityConfig(stdout) {
                 error: data.error,
                 valid: true,
                 isRemaining: true,
-                bucket1Percent: 0,
-                bucket2Percent: 0,
-                bucket3Percent: 0
+                bucket1Percent: -1,
+                bucket2Percent: -1,
+                bucket3Percent: -1
             };
         }
 
