@@ -71,6 +71,7 @@ PlasmoidItem {
 
             // Process Antigravity
             var antigravityProv = Providers.parseAntigravityConfig(antigravityData)
+            console.log("AI Usage: Antigravity parsed, error=", antigravityProv ? antigravityProv.error : "null provider")
             
             // Helper to get cached data if valid
             var getCached = function() {
@@ -85,14 +86,22 @@ PlasmoidItem {
                     // Update cache
                     root.cachedAntigravity = antigravityProv
                     root.cachedAntigravity.timestamp = new Date().getTime()
+                    antigravityProv.lastCacheTime = "" // No error, no cache time shown
+                    console.log("AI Usage: Antigravity running, cached")
                 } else {
                     // Error reported by script
+                    console.log("AI Usage: Antigravity error detected:", antigravityProv.error)
                     var cached = getCached()
                     if (cached) {
                         // Use cache but keep error
+                        console.log("AI Usage: Using cached data with error overlay")
                         antigravityProv = Object.assign({}, cached) // Shallow copy
                         antigravityProv.error = "Not Running"
                         antigravityProv.timestamp = cached.timestamp // Preserve timestamp
+                        antigravityProv.lastCacheTime = Qt.formatTime(new Date(cached.timestamp), "hh:mm:ss")
+                    } else {
+                        console.log("AI Usage: No cache available")
+                        antigravityProv.lastCacheTime = ""
                     }
                 }
             } else {
@@ -102,6 +111,7 @@ PlasmoidItem {
                     antigravityProv = Object.assign({}, cached)
                     antigravityProv.error = "Not Running"
                     antigravityProv.timestamp = cached.timestamp
+                    antigravityProv.lastCacheTime = Qt.formatTime(new Date(cached.timestamp), "hh:mm:ss")
                 } else {
                     // No cache, force default error state
                     antigravityProv = {
@@ -111,31 +121,18 @@ PlasmoidItem {
                         error: "Not Running",
                         valid: true,
                         isRemaining: true,
-                        bucket1Name: "Claude / OpenAI",
-                        bucket1Percent: -1,
-                        bucket1Used: "N/A",
-                        bucket1Limit: "N/A",
-                        bucket1Reset: "",
-                        bucket2Name: "Gemini 3 Pro",
-                        bucket2Percent: -1,
-                        bucket2Used: "N/A",
-                        bucket2Limit: "N/A",
-                        bucket2Reset: "",
-                        bucket3Name: "Gemini 3 Flash",
-                        bucket3Percent: -1,
-                        bucket3Used: "N/A",
-                        bucket3Limit: "N/A",
-                        bucket3Reset: "",
-                        bucket4Name: "Gemini 3 Pro Image",
-                        bucket4Percent: -1,
-                        bucket4Used: "N/A",
-                        bucket4Limit: "N/A",
-                        bucket4Reset: ""
+                        lastCacheTime: "",
+                        bucketsJson: JSON.stringify([
+                            { name: "Claude / OpenAI", percent: -1, used: "N/A", limit: "N/A", reset: "" },
+                            { name: "Gemini 3 Pro", percent: -1, used: "N/A", limit: "N/A", reset: "" },
+                            { name: "Gemini 3 Flash", percent: -1, used: "N/A", limit: "N/A", reset: "" }
+                        ])
                     }
                 }
             }
             
             if (antigravityProv) {
+                console.log("AI Usage: Appending antigravity, error=", antigravityProv.error, "lastCacheTime=", antigravityProv.lastCacheTime)
                 providersModel.append(antigravityProv)
             }
             
@@ -237,6 +234,11 @@ PlasmoidItem {
         return timeLeft + " " + i18n.tr("remaining") + " | " + i18n.tr("Reset:") + " " + resetTimeFormatted
     }
 
+    function getBuckets(jsonStr) {
+        try { return JSON.parse(jsonStr || "[]"); }
+        catch (e) { return []; }
+    }
+
     function getProviderTooltipText(provider) {
         if (!provider) return ""
         
@@ -245,11 +247,13 @@ PlasmoidItem {
         }
         
         if (provider.provider === "antigravity") {
-            var p1 = Math.round(provider.bucket1Percent || 0)
-            var p2 = Math.round(provider.bucket2Percent || 0)
-            var p3 = Math.round(provider.bucket3Percent || 0)
-            var debug = " [Raw: " + provider.bucket1Percent + ", " + provider.bucket2Percent + ", " + provider.bucket3Percent + " | isRem: " + provider.isRemaining + "]"
-            return provider.bucket1Name + ": " + p1 + "% | " + provider.bucket2Name + ": " + p2 + "% | " + provider.bucket3Name + ": " + p3 + "%" + debug
+            var buckets = getBuckets(provider.bucketsJson)
+            var parts = []
+            for (var i = 0; i < buckets.length; i++) {
+                var b = buckets[i]
+                parts.push(b.name + ": " + Math.round(b.percent || 0) + "%")
+            }
+            return parts.join(" | ")
         }
         
         // Claude fallback
@@ -276,6 +280,11 @@ PlasmoidItem {
         Layout.minimumHeight: Kirigami.Units.iconSizes.medium
         Layout.preferredWidth: compactRow.implicitWidth + Kirigami.Units.largeSpacing * 2
 
+        // IMPORTANT: Do NOT add custom ToolTip components here that could block mouse clicks.
+        // The tooltip is handled at the plasmoid level via toolTipMainText/toolTipSubText
+        // properties (see bottom of file). If custom tooltips are ever added, they MUST be
+        // offset so they don't appear directly under the mouse cursor, otherwise users
+        // won't be able to click on the widget while hovering.
         MouseArea {
             id: compactMouseArea
             anchors.fill: parent
@@ -329,6 +338,10 @@ PlasmoidItem {
                     property bool isAntigravity: model.provider === "antigravity"
                     property bool isRemainingMode: model.isRemaining === true
                     
+                    // Parse buckets for antigravity
+                    property var antigravityBuckets: isAntigravity ? getBuckets(model.bucketsJson) : []
+                    property real firstBucketPercent: antigravityBuckets.length > 0 ? (antigravityBuckets[0].percent !== undefined ? antigravityBuckets[0].percent : -1) : -1
+                    
                     property real displayValue: {
                         if (isAmp) {
                             if (model.freeLimit > 0 && model.freeUsed < model.freeLimit) {
@@ -337,13 +350,13 @@ PlasmoidItem {
                                 return Math.floor(model.creditBalance || 0)
                             }
                         }
-                        if (isAntigravity) return model.bucket1Percent !== -1 ? model.bucket1Percent : 0
+                        if (isAntigravity) return firstBucketPercent !== -1 ? firstBucketPercent : 0
                         return model.sessionUsage || 0
                     }
                     
                     property string displayText: {
                         if (isAmp) return "$" + displayValue
-                        if (isAntigravity && model.bucket1Percent === -1) return "?%"
+                        if (isAntigravity && firstBucketPercent === -1) return "?%"
                         return Math.round(displayValue) + "%"
                     }
                     
@@ -356,7 +369,7 @@ PlasmoidItem {
                             }
                         }
                         if (isAntigravity && isRemainingMode) {
-                             if (model.bucket1Percent === -1) return Kirigami.Theme.disabledTextColor
+                             if (firstBucketPercent === -1) return Kirigami.Theme.disabledTextColor
                              if (displayValue > 50) return Kirigami.Theme.positiveTextColor
                              if (displayValue > 20) return Kirigami.Theme.neutralTextColor
                              return Kirigami.Theme.negativeTextColor
@@ -447,15 +460,25 @@ PlasmoidItem {
                             font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.1
                         }
                         
-                        // Error message/status next to header
+                        Item { Layout.fillWidth: true }
+                        
+                        // Error message/status (right-aligned)
                         PlasmaComponents.Label {
-                            visible: model.provider === "antigravity" && model.error !== undefined
-                            text: " (" + i18n.tr("Not Running") + ")"
+                            visible: model.provider === "antigravity" && model.error && model.error !== ""
+                            text: {
+                                var msg = i18n.tr("Not Running")
+                                if (model.lastCacheTime && model.lastCacheTime !== "") {
+                                    msg += "\n" + i18n.tr("Last Updated at") + " " + model.lastCacheTime
+                                }
+                                return msg
+                            }
                             color: Kirigami.Theme.negativeTextColor
                             font.italic: true
+                            font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                            lineHeight: 0.9
+                            horizontalAlignment: Text.AlignRight
                         }
                         
-                        Item { Layout.fillWidth: true }
                         Rectangle {
                             visible: model.plan !== undefined
                             Layout.preferredWidth: planLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
@@ -501,41 +524,40 @@ PlasmoidItem {
 
                     // Antigravity Specific UI
                     ColumnLayout {
+                        id: antigravityLayout
                         visible: model.provider === "antigravity"
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
+                        
+                        property var bucketsList: getBuckets(model.bucketsJson)
+                        property bool isRemainingMode: model.isRemaining === true
 
-                        UsageBar {
-                            label: model.bucket1Name || "Small"
-                            value: model.bucket1Percent !== -1 ? model.bucket1Percent : 0
-                            valueText: model.bucket1Percent !== -1 ? (Math.round(model.bucket1Percent) + "%") : "?%"
-                            customColor: (model.isRemaining && model.bucket1Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket1Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining && model.bucket1Percent !== -1 ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor))
-                            subtext: (model.isRemaining && model.bucket1Reset && model.bucket1Percent !== -1) ? formatResetTime(model.bucket1Reset) : ((model.bucket1Limit === "N/A") ? "" : ((model.bucket1Used || 0) + "/" + (model.bucket1Limit || 0)))
-                            tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
-                        }
-                        UsageBar {
-                            label: model.bucket2Name || "Medium"
-                            value: model.bucket2Percent !== -1 ? model.bucket2Percent : 0
-                            valueText: model.bucket2Percent !== -1 ? (Math.round(model.bucket2Percent) + "%") : "?%"
-                            customColor: (model.isRemaining && model.bucket2Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket2Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining && model.bucket2Percent !== -1 ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor))
-                            subtext: (model.isRemaining && model.bucket2Reset && model.bucket2Percent !== -1) ? formatResetTime(model.bucket2Reset) : ((model.bucket2Limit === "N/A") ? "" : ((model.bucket2Used || 0) + "/" + (model.bucket2Limit || 0)))
-                            tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
-                        }
-                        UsageBar {
-                            label: model.bucket3Name || "Large"
-                            value: model.bucket3Percent !== -1 ? model.bucket3Percent : 0
-                            valueText: model.bucket3Percent !== -1 ? (Math.round(model.bucket3Percent) + "%") : "?%"
-                            customColor: (model.isRemaining && model.bucket3Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket3Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining && model.bucket3Percent !== -1 ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.disabledTextColor))
-                            subtext: (model.isRemaining && model.bucket3Reset && model.bucket3Percent !== -1) ? formatResetTime(model.bucket3Reset) : ((model.bucket3Limit === "N/A") ? "" : ((model.bucket3Used || 0) + "/" + (model.bucket3Limit || 0)))
-                            tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
-                        }
-                        UsageBar {
-                            visible: false // Hidden for now
-                            label: model.bucket4Name || "Image"
-                            value: model.bucket4Percent || 0
-                            customColor: (model.isRemaining && model.bucket4Percent > 50) ? Kirigami.Theme.positiveTextColor : ((model.isRemaining && model.bucket4Percent > 20) ? Kirigami.Theme.neutralTextColor : (model.isRemaining ? Kirigami.Theme.negativeTextColor : "transparent"))
-                            subtext: (model.isRemaining && model.bucket4Reset) ? formatResetTime(model.bucket4Reset) : ((model.bucket4Limit === "N/A") ? "" : ((model.bucket4Used || 0) + "/" + (model.bucket4Limit || 0)))
-                            tooltipSuffix: model.isRemaining ? i18n.tr("remaining") : i18n.tr("used")
+                        Repeater {
+                            model: antigravityLayout.bucketsList
+                            delegate: UsageBar {
+                                required property var modelData
+                                required property int index
+                                
+                                property real bucketPercent: modelData.percent !== undefined ? modelData.percent : -1
+                                
+                                label: modelData.name || ("Bucket " + (index + 1))
+                                value: bucketPercent !== -1 ? bucketPercent : 0
+                                valueText: bucketPercent !== -1 ? (Math.round(bucketPercent) + "%") : "?%"
+                                customColor: {
+                                    if (antigravityLayout.isRemainingMode && bucketPercent > 50) return Kirigami.Theme.positiveTextColor
+                                    if (antigravityLayout.isRemainingMode && bucketPercent > 20) return Kirigami.Theme.neutralTextColor
+                                    if (antigravityLayout.isRemainingMode && bucketPercent !== -1) return Kirigami.Theme.negativeTextColor
+                                    return Kirigami.Theme.disabledTextColor
+                                }
+                                subtext: {
+                                    if (antigravityLayout.isRemainingMode && modelData.reset && bucketPercent !== -1) {
+                                        return formatResetTime(modelData.reset)
+                                    }
+                                    if (modelData.limit === "N/A") return ""
+                                    return (modelData.used || 0) + "/" + (modelData.limit || 0)
+                                }
+                                tooltipSuffix: antigravityLayout.isRemainingMode ? i18n.tr("remaining") : i18n.tr("used")
+                            }
                         }
                     }
 
@@ -662,6 +684,10 @@ PlasmoidItem {
     }
 
     Plasmoid.icon: "widget"
+    
+    // IMPORTANT: These plasmoid-level tooltip properties are handled by the Plasma shell
+    // and appear offset from the widget. Do NOT replace with custom ToolTip components
+    // that could block mouse clicks on the compact representation.
     toolTipMainText: i18n.tr("AI Usage")
     toolTipSubText: {
         var tooltips = []

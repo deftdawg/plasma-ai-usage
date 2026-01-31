@@ -47,7 +47,9 @@ QtObject {
             "Replenishes:": "Replenishes:",
             "remaining": "remaining",
             "used": "used",
-            "Reset:": "Reset:"
+            "Reset:": "Reset:",
+            "Not Running": "Not Running",
+            "Last Updated at": "Last Updated at"
         },
         "hu_HU": {
             "Claude Usage": "Claude használat",

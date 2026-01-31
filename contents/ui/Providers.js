@@ -1,3 +1,8 @@
+// Helper to create buckets JSON string for ListModel storage
+function makeBucketsJson(buckets) {
+    return JSON.stringify(buckets || []);
+}
+
 function parseClaudeCredentials(stdout) {
     if (stdout.length < 10) return null;
     try {
@@ -20,27 +25,7 @@ function parseClaudeCredentials(stdout) {
             plan: planMap[tier] || tier,
             isRemaining: false,
             valid: true,
-            // Default bucket properties for ListModel role consistency
-            bucket1Name: "",
-            bucket1Percent: 0,
-            bucket1Used: "",
-            bucket1Limit: "",
-            bucket1Reset: "",
-            bucket2Name: "",
-            bucket2Percent: 0,
-            bucket2Used: "",
-            bucket2Limit: "",
-            bucket2Reset: "",
-            bucket3Name: "",
-            bucket3Percent: 0,
-            bucket3Used: "",
-            bucket3Limit: "",
-            bucket3Reset: "",
-            bucket4Name: "",
-            bucket4Percent: 0,
-            bucket4Used: "",
-            bucket4Limit: "",
-            bucket4Reset: ""
+            bucketsJson: makeBucketsJson([])
         };
     } catch (e) {
         console.log("Claude Usage: Failed to parse credentials:", e);
@@ -62,9 +47,12 @@ function parseAntigravityConfig(stdout) {
                 error: data.error,
                 valid: true,
                 isRemaining: true,
-                bucket1Percent: -1,
-                bucket2Percent: -1,
-                bucket3Percent: -1
+                lastCacheTime: "", // Will be set by main.qml if cached data is used
+                bucketsJson: makeBucketsJson([
+                    { name: "Claude / OpenAI", percent: -1, used: "N/A", limit: "N/A", reset: "" },
+                    { name: "Gemini 3 Pro", percent: -1, used: "N/A", limit: "N/A", reset: "" },
+                    { name: "Gemini 3 Flash", percent: -1, used: "N/A", limit: "N/A", reset: "" }
+                ])
             };
         }
 
@@ -100,32 +88,35 @@ function parseAntigravityConfig(stdout) {
                 name: "Antigravity",
                 icon: "antigravity.svg",
                 
-                bucket1Name: "Claude / OpenAI",
-                bucket1Percent: opus.remaining !== undefined ? opus.remaining : 0,
-                bucket1Used: "N/A",
-                bucket1Limit: "N/A",
-                bucket1Reset: opus.reset || "",
-                
-                bucket2Name: "Gemini 3 Pro",
-                bucket2Percent: geminiPro.remaining !== undefined ? geminiPro.remaining : 0,
-                bucket2Used: "N/A",
-                bucket2Limit: "N/A",
-                bucket2Reset: geminiPro.reset || "",
-                
-                bucket3Name: "Gemini 3 Flash",
-                bucket3Percent: geminiFlash.remaining !== undefined ? geminiFlash.remaining : 0,
-                bucket3Used: "N/A",
-                bucket3Limit: "N/A",
-                bucket3Reset: geminiFlash.reset || "",
-                
-                bucket4Name: "Gemini Pro Image",
-                bucket4Percent: 0,
-                bucket4Used: "N/A",
-                bucket4Limit: "N/A",
-                bucket4Reset: "",
+                bucketsJson: makeBucketsJson([
+                    {
+                        name: "Claude / OpenAI",
+                        percent: opus.remaining !== undefined ? opus.remaining : 0,
+                        used: "N/A",
+                        limit: "N/A",
+                        reset: opus.reset || ""
+                    },
+                    {
+                        name: "Gemini 3 Pro",
+                        percent: geminiPro.remaining !== undefined ? geminiPro.remaining : 0,
+                        used: "N/A",
+                        limit: "N/A",
+                        reset: geminiPro.reset || ""
+                    },
+                    {
+                        name: "Gemini 3 Flash",
+                        percent: geminiFlash.remaining !== undefined ? geminiFlash.remaining : 0,
+                        used: "N/A",
+                        limit: "N/A",
+                        reset: geminiFlash.reset || ""
+                    }
+                ]),
                 
                 isRemaining: true, // Signal to UI to treat as remaining
-                valid: true
+                valid: true,
+                // These must always be defined for ListModel role consistency
+                error: "",
+                lastCacheTime: ""
             };
         }
 
@@ -145,28 +136,34 @@ function parseAntigravityConfig(stdout) {
             provider: "antigravity",
             name: "Antigravity",
             icon: "antigravity.svg",
-            bucket1Name: bucket1.name || "Small",
-            bucket1Used: b1Used,
-            bucket1Limit: b1Limit,
-            bucket1Percent: b1Limit > 0 ? (b1Used / b1Limit * 100) : 0,
-            bucket1Reset: "",
-            bucket2Name: bucket2.name || "Medium",
-            bucket2Used: b2Used,
-            bucket2Limit: b2Limit,
-            bucket2Percent: b2Limit > 0 ? (b2Used / b2Limit * 100) : 0,
-            bucket2Reset: "",
-            bucket3Name: bucket3.name || "Large",
-            bucket3Used: b3Used,
-            bucket3Limit: b3Limit,
-            bucket3Percent: b3Limit > 0 ? (b3Used / b3Limit * 100) : 0,
-            bucket3Reset: "",
-            bucket4Name: "",
-            bucket4Used: "",
-            bucket4Limit: "",
-            bucket4Percent: 0,
-            bucket4Reset: "",
+            bucketsJson: makeBucketsJson([
+                {
+                    name: bucket1.name || "Small",
+                    used: b1Used,
+                    limit: b1Limit,
+                    percent: b1Limit > 0 ? (b1Used / b1Limit * 100) : 0,
+                    reset: ""
+                },
+                {
+                    name: bucket2.name || "Medium",
+                    used: b2Used,
+                    limit: b2Limit,
+                    percent: b2Limit > 0 ? (b2Used / b2Limit * 100) : 0,
+                    reset: ""
+                },
+                {
+                    name: bucket3.name || "Large",
+                    used: b3Used,
+                    limit: b3Limit,
+                    percent: b3Limit > 0 ? (b3Used / b3Limit * 100) : 0,
+                    reset: ""
+                }
+            ]),
             isRemaining: false,
-            valid: true
+            valid: true,
+            // These must always be defined for ListModel role consistency
+            error: "",
+            lastCacheTime: ""
         };
     } catch (e) {
         console.log("Antigravity: Failed to parse config:", e);
@@ -204,27 +201,7 @@ function parseAmpConfig(stdout) {
             creditCurrency: credits.currency || "USD",
             isRemaining: true,
             valid: true,
-            // Default bucket properties for ListModel role consistency
-            bucket1Name: "",
-            bucket1Percent: 0,
-            bucket1Used: "",
-            bucket1Limit: "",
-            bucket1Reset: "",
-            bucket2Name: "",
-            bucket2Percent: 0,
-            bucket2Used: "",
-            bucket2Limit: "",
-            bucket2Reset: "",
-            bucket3Name: "",
-            bucket3Percent: 0,
-            bucket3Used: "",
-            bucket3Limit: "",
-            bucket3Reset: "",
-            bucket4Name: "",
-            bucket4Percent: 0,
-            bucket4Used: "",
-            bucket4Limit: "",
-            bucket4Reset: ""
+            bucketsJson: makeBucketsJson([])
         };
     } catch (e) {
         // Fallback to text parsing if JSON fails
@@ -246,27 +223,7 @@ function parseAmpUsageText(text) {
             creditCurrency: "USD",
             isRemaining: true,
             valid: true,
-            // Default bucket properties for ListModel role consistency
-            bucket1Name: "",
-            bucket1Percent: 0,
-            bucket1Used: "",
-            bucket1Limit: "",
-            bucket1Reset: "",
-            bucket2Name: "",
-            bucket2Percent: 0,
-            bucket2Used: "",
-            bucket2Limit: "",
-            bucket2Reset: "",
-            bucket3Name: "",
-            bucket3Percent: 0,
-            bucket3Used: "",
-            bucket3Limit: "",
-            bucket3Reset: "",
-            bucket4Name: "",
-            bucket4Percent: 0,
-            bucket4Used: "",
-            bucket4Limit: "",
-            bucket4Reset: ""
+            bucketsJson: makeBucketsJson([])
         };
 
         // Parse Amp Free: $10.71/$20 remaining (replenishes +$0.83/hour)
