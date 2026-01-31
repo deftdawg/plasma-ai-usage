@@ -53,6 +53,21 @@ function parseAntigravityConfig(stdout) {
     try {
         var data = JSON.parse(stdout);
         
+        // Handle error from antigravity.py
+        if (data.error) {
+            return {
+                provider: "antigravity",
+                name: "Antigravity",
+                icon: "antigravity.svg",
+                error: data.error,
+                valid: true,
+                isRemaining: true,
+                bucket1Percent: 0,
+                bucket2Percent: 0,
+                bucket3Percent: 0
+            };
+        }
+
         // Handle new format from antigravity.py
         if (data.models) {
             var models = data.models || [];
