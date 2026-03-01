@@ -14,6 +14,9 @@ KCM.SimpleKCM {
 
     property string cfg_language
     property int cfg_refreshInterval
+    property bool cfg_haEnabled
+    property string cfg_haSensorUri
+    property string cfg_haAccessToken
 
     // Translation helper
     Translations {
@@ -66,6 +69,56 @@ KCM.SimpleKCM {
 
             QQC2.Label {
                 text: tr("minutes")
+            }
+        }
+
+        // Home Assistant Section
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: tr("Home Assistant")
+        }
+
+        QQC2.Switch {
+            id: haEnabledSwitch
+            Kirigami.FormData.label: tr("Publish to Home Assistant")
+            checked: cfg_haEnabled
+            onCheckedChanged: cfg_haEnabled = checked
+        }
+
+        QQC2.TextField {
+            id: haSensorUriField
+            Kirigami.FormData.label: tr("Sensor URI")
+            Layout.fillWidth: true
+            enabled: haEnabledSwitch.checked
+            text: cfg_haSensorUri
+            onTextChanged: cfg_haSensorUri = text
+            placeholderText: "http://homeassistant.local:8123/api/states/sensor.ai_usage_applet"
+        }
+
+        QQC2.TextField {
+            id: haAccessTokenField
+            Kirigami.FormData.label: tr("Access Token")
+            Layout.fillWidth: true
+            enabled: haEnabledSwitch.checked
+            text: cfg_haAccessToken
+            onTextChanged: cfg_haAccessToken = text
+            echoMode: TextInput.Password
+            placeholderText: tr("Long-lived access token")
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: " "
+            
+            QQC2.Label {
+                text: "<a href='https://my.home-assistant.io/redirect/profile_security/'>" + tr("Get Token") + "</a>"
+                textFormat: Text.RichText
+                onLinkActivated: function(link) { Qt.openUrlExternally(link) }
+                
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+                }
             }
         }
     }

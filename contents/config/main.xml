@@ -14,5 +14,17 @@
             <label>Refresh interval in minutes</label>
             <default>1</default>
         </entry>
+        <entry name="haEnabled" type="Bool">
+            <label>Enable publishing to Home Assistant</label>
+            <default>false</default>
+        </entry>
+        <entry name="haSensorUri" type="String">
+            <label>Home Assistant sensor API URI</label>
+            <default>http://homeassistant.local:8123/api/states/sensor.ai_usage_applet</default>
+        </entry>
+        <entry name="haAccessToken" type="String">
+            <label>Home Assistant long-lived access token</label>
+            <default></default>
+        </entry>
     </group>
 </kcfg>

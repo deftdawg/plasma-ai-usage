@@ -6,22 +6,22 @@
   ],
   "shell": {
     "init_hook": [
-      "echo \"Welcome to the Plasma AI Usage dev environment!\"",
+      "echo -e \"\\033[1;36m🚀 Welcome to the Plasma AI Usage dev environment!\\033[0m\"",
       "echo \"\"",
-      "echo \"To build and install the widget locally:\"",
-      "echo \"  kpackagetool6 -t Plasma/Applet -i .\"",
+      "echo -e \"\\033[1;33m📦 To build and install the widget locally:\\033[0m\"",
+      "echo -e \"  \\033[0;32mkpackagetool6 -t Plasma/Applet -i .\\033[0m\"",
       "echo \"\"",
-      "echo \"To update an existing installation:\"",
-      "echo \"  kpackagetool6 -t Plasma/Applet -u .\"",
+      "echo -e \"\\033[1;33m🔄 To update an existing installation:\\033[0m\"",
+      "echo -e \"  \\033[0;32mkpackagetool6 -t Plasma/Applet -u .\\033[0m\"",
       "echo \"\"",
-      "echo \"To view logs:\"",
-      "echo \"  journalctl --user -f | grep -i 'AI Usage'\"",
+      "echo -e \"\\033[1;33m📋 To view logs:\\033[0m\"",
+      "echo -e \"  \\033[0;32mjournalctl --user -f | grep -i 'AI Usage'\\033[0m\"",
       "echo \"\"",
-      "echo \"To restart Plasma Shell (to reload widget):\"",
-      "echo \"  kquitapp6 plasmashell && kstart plasmashell\"",
+      "echo -e \"\\033[1;33m♻️  To restart Plasma Shell (to reload widget):\\033[0m\"",
+      "echo -e \"  \\033[0;32mkquitapp6 plasmashell && kstart plasmashell\\033[0m\"",
       "echo \"\"",
-      "echo \"To test without restarting Plasma (requires plasma-sdk):\"",
-      "echo \"  plasmoidviewer -a .\""
+      "echo -e \"\\033[1;33m🧪 To test without restarting Plasma (requires plasma-sdk):\\033[0m\"",
+      "echo -e \"  \\033[0;32mplasmoidviewer -a .\\033[0m\""
     ],
     "scripts": {
       "test": [

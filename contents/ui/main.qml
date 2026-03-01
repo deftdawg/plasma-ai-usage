@@ -20,6 +20,9 @@ PlasmoidItem {
     property bool isLoading: false
     property string claudeToken: ""
     property var cachedAntigravity: null
+    property string haPublishStatus: "disabled"  // "disabled", "success", "error"
+    property bool haDialogVisible: false
+    property bool showResetTimeToggle: false  // Alternates on refresh for 0% display
 
     // Model to store provider data
     ListModel {
@@ -144,6 +147,10 @@ PlasmoidItem {
             
             root.lastUpdate = Qt.formatTime(new Date(), "hh:mm:ss")
             root.isLoading = false
+            root.showResetTimeToggle = !root.showResetTimeToggle
+            
+            // Publish to Home Assistant if enabled
+            publishToHomeAssistant()
         }
     }
 
@@ -214,6 +221,76 @@ PlasmoidItem {
 
     function refresh() {
         loadCredentials()
+    }
+
+    function publishToHomeAssistant() {
+        if (!Plasmoid.configuration.haEnabled) {
+            root.haPublishStatus = "disabled"
+            return
+        }
+        
+        var sensorUri = Plasmoid.configuration.haSensorUri
+        var accessToken = Plasmoid.configuration.haAccessToken
+        
+        if (!sensorUri || !accessToken) {
+            root.haPublishStatus = "error"
+            console.log("HA Publish: Missing sensor URI or access token")
+            return
+        }
+        
+        // Build provider data for the sensor attributes
+        var providers = []
+        for (var i = 0; i < providersModel.count; i++) {
+            var p = providersModel.get(i)
+            var providerData = {
+                name: p.name,
+                provider: p.provider
+            }
+            
+            if (p.provider === "claude") {
+                providerData.session_usage = p.sessionUsage || 0
+                providerData.weekly_usage = p.weeklyUsage || 0
+                providerData.sonnet_usage = p.sonnetUsage || 0
+                providerData.opus_usage = p.opusUsage || 0
+            } else if (p.provider === "antigravity") {
+                providerData.buckets = getBuckets(p.bucketsJson)
+                providerData.error = p.error || ""
+            } else if (p.provider === "amp") {
+                providerData.free_used = p.freeUsed || 0
+                providerData.free_limit = p.freeLimit || 0
+                providerData.credit_balance = p.creditBalance || 0
+            }
+            
+            providers.push(providerData)
+        }
+        
+        var payload = {
+            state: root.errorMsg ? "error" : "ok",
+            attributes: {
+                friendly_name: "AI Usage Applet",
+                providers: providers,
+                last_updated: new Date().toISOString()
+            }
+        }
+        
+        var xhr = new XMLHttpRequest()
+        xhr.open("POST", sensorUri)
+        xhr.setRequestHeader("Authorization", "Bearer " + accessToken)
+        xhr.setRequestHeader("Content-Type", "application/json")
+        
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (xhr.status === 200 || xhr.status === 201) {
+                    root.haPublishStatus = "success"
+                    console.log("HA Publish: Success")
+                } else {
+                    root.haPublishStatus = "error"
+                    console.log("HA Publish: Failed with status", xhr.status, xhr.responseText)
+                }
+            }
+        }
+        
+        xhr.send(JSON.stringify(payload))
     }
 
     function formatResetTime(resetTimeStr) {
@@ -602,14 +679,265 @@ PlasmoidItem {
                 }
             }
 
-            PlasmaComponents.Button {
-                Layout.alignment: Qt.AlignRight
-                icon.name: "view-refresh"
-                text: i18n.tr("Refresh")
-                onClicked: refresh()
+            // Button row: HA button on left, Refresh on right
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Kirigami.Units.smallSpacing
+                
+                // Home Assistant Button
+                Item {
+                    id: haButtonContainer
+                    width: refreshButton.height
+                    height: refreshButton.height
+                    
+                    Rectangle {
+                        id: haButton
+                        anchors.fill: parent
+                        radius: 4
+                        color: haMouseArea.pressed ? Kirigami.Theme.highlightColor : (haMouseArea.containsMouse ? Kirigami.Theme.hoverColor : Kirigami.Theme.backgroundColor)
+                        border.width: 2
+                        border.color: {
+                            if (!Plasmoid.configuration.haEnabled) 
+                                return Kirigami.Theme.disabledTextColor
+                            if (root.haPublishStatus === "success") 
+                                return Kirigami.Theme.positiveTextColor
+                            if (root.haPublishStatus === "error") 
+                                return Kirigami.Theme.negativeTextColor
+                            return Kirigami.Theme.disabledTextColor
+                        }
+                        
+                        Kirigami.Icon {
+                            anchors.centerIn: parent
+                            width: Kirigami.Units.iconSizes.smallMedium
+                            height: Kirigami.Units.iconSizes.smallMedium
+                            source: Qt.resolvedUrl("../icons/home-assistant.svg")
+                            color: Kirigami.Theme.textColor
+                            isMask: true
+                        }
+                    }
+                    
+                    MouseArea {
+                        id: haMouseArea
+                        anchors.fill: parent
+                        z: 100
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        
+                        onClicked: {
+                            console.log("HA Button clicked!")
+                            root.haDialogVisible = true
+                        }
+                    }
+                    
+                    // Tooltip text via property for hover display
+                    property string tooltipText: {
+                        if (!Plasmoid.configuration.haEnabled)
+                            return i18n.tr("Publishing disabled")
+                        if (root.haPublishStatus === "success")
+                            return i18n.tr("Publishing enabled") + " - " + i18n.tr("Connection successful")
+                        if (root.haPublishStatus === "error")
+                            return i18n.tr("Publishing enabled") + " - " + i18n.tr("Connection failed")
+                        return i18n.tr("Publishing enabled")
+                    }
+                }
+                
+                Item { Layout.fillWidth: true }
+                
+                PlasmaComponents.Button {
+                    id: refreshButton
+                    icon.name: "view-refresh"
+                    text: i18n.tr("Refresh")
+                    onClicked: refresh()
+                }
+            }
+        }
+        
+        // Home Assistant Configuration Dialog (overlay)
+        Loader {
+            id: haDialogLoader
+            anchors.fill: parent
+            z: 1000
+            active: root.haDialogVisible
+            sourceComponent: Component {
+                Item {
+                    id: dialogOverlay
+                    anchors.fill: parent
+                    
+                    // Semi-transparent backdrop
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "#80000000"
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: root.haDialogVisible = false
+                        }
+                    }
+                    
+                    // Dialog box
+                    Rectangle {
+                        id: dialogBox
+                        anchors.centerIn: parent
+                        width: Math.min(parent.width - Kirigami.Units.largeSpacing * 4, Kirigami.Units.gridUnit * 22)
+                        height: dialogContent.implicitHeight + Kirigami.Units.largeSpacing * 2
+                        radius: 8
+                        color: Kirigami.Theme.backgroundColor
+                        border.color: Kirigami.Theme.disabledTextColor
+                        border.width: 1
+                        
+                        ColumnLayout {
+                            id: dialogContent
+                            anchors.fill: parent
+                            anchors.margins: Kirigami.Units.largeSpacing
+                            spacing: Kirigami.Units.mediumSpacing
+                            
+                            // Header
+                            PlasmaComponents.Label {
+                                text: i18n.tr("Configure Home Assistant")
+                                font.bold: true
+                                font.pixelSize: Kirigami.Theme.defaultFont.pixelSize * 1.2
+                            }
+                            
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Kirigami.Theme.disabledTextColor
+                                opacity: 0.3
+                            }
+                            
+                            // Toggle
+                            RowLayout {
+                                Layout.fillWidth: true
+                                PlasmaComponents.Label {
+                                    text: i18n.tr("Publish to Home Assistant")
+                                }
+                                Item { Layout.fillWidth: true }
+                                PlasmaComponents.Switch {
+                                    id: haDialogToggle
+                                    checked: Plasmoid.configuration.haEnabled
+                                    onCheckedChanged: Plasmoid.configuration.haEnabled = checked
+                                }
+                            }
+                            
+                            // Sensor URI
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                PlasmaComponents.Label {
+                                    text: i18n.tr("Sensor URI")
+                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                }
+                                PlasmaComponents.TextField {
+                                    id: haDialogUri
+                                    Layout.fillWidth: true
+                                    text: Plasmoid.configuration.haSensorUri
+                                    enabled: haDialogToggle.checked
+                                    onTextChanged: Plasmoid.configuration.haSensorUri = text
+                                    placeholderText: "http://homeassistant.local:8123/api/states/sensor.ai_usage_applet"
+                                }
+                            }
+                            
+                            // Access Token
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                PlasmaComponents.Label {
+                                    text: i18n.tr("Access Token")
+                                    font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                }
+                                PlasmaComponents.TextField {
+                                    id: haDialogToken
+                                    Layout.fillWidth: true
+                                    text: Plasmoid.configuration.haAccessToken
+                                    enabled: haDialogToggle.checked
+                                    onTextChanged: Plasmoid.configuration.haAccessToken = text
+                                    echoMode: TextInput.Password
+                                    placeholderText: "Long-lived access token"
+                                }
+                            }
+                            
+                            // Get Token link
+                            PlasmaComponents.Label {
+                                text: "<a href='https://my.home-assistant.io/redirect/profile_security/'>" + i18n.tr("Get Token") + "</a>"
+                                textFormat: Text.RichText
+                                font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                                onLinkActivated: function(link) { Qt.openUrlExternally(link) }
+                                
+                                MouseArea {
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.NoButton
+                                    cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                }
+                            }
+                            
+                            Rectangle {
+                                Layout.fillWidth: true
+                                height: 1
+                                color: Kirigami.Theme.disabledTextColor
+                                opacity: 0.3
+                            }
+                            
+                            // Buttons
+                            RowLayout {
+                                Layout.fillWidth: true
+                                
+                                PlasmaComponents.Button {
+                                    text: i18n.tr("Test Connection")
+                                    enabled: haDialogToggle.checked && haDialogUri.text && haDialogToken.text
+                                    onClicked: {
+                                        testResultIcon.visible = false
+                                        publishToHomeAssistant()
+                                        testResultTimer.start()
+                                    }
+                                }
+                                
+                                // Test result indicator
+                                Kirigami.Icon {
+                                    id: testResultIcon
+                                    width: Kirigami.Units.iconSizes.small
+                                    height: Kirigami.Units.iconSizes.small
+                                    visible: false
+                                    source: root.haPublishStatus === "success" ? "checkmark" : "dialog-error"
+                                    color: root.haPublishStatus === "success" ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+                                }
+                                
+                                // Timer to show result then hide after 5 seconds
+                                Timer {
+                                    id: testResultTimer
+                                    interval: 500  // Check every 500ms if result is ready
+                                    repeat: true
+                                    onTriggered: {
+                                        if (root.haPublishStatus === "success" || root.haPublishStatus === "error") {
+                                            testResultIcon.visible = true
+                                            repeat = false
+                                            hideResultTimer.start()
+                                            stop()
+                                        }
+                                    }
+                                }
+                                
+                                Timer {
+                                    id: hideResultTimer
+                                    interval: 5000
+                                    onTriggered: {
+                                        testResultIcon.visible = false
+                                        testResultTimer.repeat = true
+                                    }
+                                }
+                                
+                                Item { Layout.fillWidth: true }
+                                
+                                PlasmaComponents.Button {
+                                    text: i18n.tr("Cancel")
+                                    onClicked: root.haDialogVisible = false
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
+    
     
     // Reusable Usage Bar Component
     component UsageBar : Item {

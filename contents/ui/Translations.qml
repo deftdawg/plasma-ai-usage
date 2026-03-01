@@ -49,7 +49,20 @@ QtObject {
             "used": "used",
             "Reset:": "Reset:",
             "Not Running": "Not Running",
-            "Last Updated at": "Last Updated at"
+            "Last Updated at": "Last Updated at",
+            "Home Assistant": "Home Assistant",
+            "Publish to Home Assistant": "Publish to Home Assistant",
+            "Sensor URI": "Sensor URI",
+            "Access Token": "Access Token",
+            "Get Token": "Get Token",
+            "Publishing enabled": "Publishing enabled",
+            "Publishing disabled": "Publishing disabled",
+            "Test Connection": "Test Connection",
+            "Connection successful": "Connection successful",
+            "Connection failed": "Connection failed",
+            "Configure Home Assistant": "Configure Home Assistant",
+            "Save": "Save",
+            "Cancel": "Cancel"
         },
         "hu_HU": {
             "Claude Usage": "Claude használat",
