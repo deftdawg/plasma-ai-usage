@@ -127,8 +127,8 @@ PlasmoidItem {
                         lastCacheTime: "",
                         bucketsJson: JSON.stringify([
                             { name: "Claude / OpenAI", percent: -1, used: "N/A", limit: "N/A", reset: "" },
-                            { name: "Gemini 3 Pro", percent: -1, used: "N/A", limit: "N/A", reset: "" },
-                            { name: "Gemini 3 Flash", percent: -1, used: "N/A", limit: "N/A", reset: "" }
+                            { name: "Gemini Pro", percent: -1, used: "N/A", limit: "N/A", reset: "" },
+                            { name: "Gemini Flash", percent: -1, used: "N/A", limit: "N/A", reset: "" }
                         ])
                     }
                 }
@@ -311,6 +311,26 @@ PlasmoidItem {
         return timeLeft + " " + i18n.tr("remaining") + " | " + i18n.tr("Reset:") + " " + resetTimeFormatted
     }
 
+    function getLargestResetComponent(resetTimeStr) {
+        if (!resetTimeStr) return ""
+        
+        var resetDate = new Date(resetTimeStr)
+        var now = new Date()
+        var diffMs = resetDate.getTime() - now.getTime()
+        
+        if (diffMs <= 0) return "0m"
+        
+        var diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+        var diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+        var diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+        var diffSecs = Math.floor((diffMs % (1000 * 60)) / 1000)
+        
+        if (diffDays > 0) return diffDays + "d"
+        if (diffHours > 0) return diffHours + "h"
+        if (diffMins > 0) return diffMins + "m"
+        return diffSecs + "s"
+    }
+
     function getBuckets(jsonStr) {
         try { return JSON.parse(jsonStr || "[]"); }
         catch (e) { return []; }
@@ -418,6 +438,7 @@ PlasmoidItem {
                     // Parse buckets for antigravity
                     property var antigravityBuckets: isAntigravity ? getBuckets(model.bucketsJson) : []
                     property real firstBucketPercent: antigravityBuckets.length > 0 ? (antigravityBuckets[0].percent !== undefined ? antigravityBuckets[0].percent : -1) : -1
+                    property string firstBucketReset: antigravityBuckets.length > 0 ? (antigravityBuckets[0].reset || "") : ""
                     
                     property real displayValue: {
                         if (isAmp) {
@@ -434,6 +455,9 @@ PlasmoidItem {
                     property string displayText: {
                         if (isAmp) return "$" + displayValue
                         if (isAntigravity && firstBucketPercent === -1) return "?%"
+                        if (isAntigravity && Math.round(firstBucketPercent) === 0 && root.showResetTimeToggle && firstBucketReset) {
+                            return getLargestResetComponent(firstBucketReset)
+                        }
                         return Math.round(displayValue) + "%"
                     }
                     
@@ -627,7 +651,7 @@ PlasmoidItem {
                                     return Kirigami.Theme.disabledTextColor
                                 }
                                 subtext: {
-                                    if (antigravityLayout.isRemainingMode && modelData.reset && bucketPercent !== -1) {
+                                    if (antigravityLayout.isRemainingMode && modelData.reset && modelData.reset !== "" && bucketPercent >= 0) {
                                         return formatResetTime(modelData.reset)
                                     }
                                     if (modelData.limit === "N/A") return ""

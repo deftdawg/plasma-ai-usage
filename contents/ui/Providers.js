@@ -50,8 +50,8 @@ function parseAntigravityConfig(stdout) {
                 lastCacheTime: "", // Will be set by main.qml if cached data is used
                 bucketsJson: makeBucketsJson([
                     { name: "Claude / OpenAI", percent: -1, used: "N/A", limit: "N/A", reset: "" },
-                    { name: "Gemini 3 Pro", percent: -1, used: "N/A", limit: "N/A", reset: "" },
-                    { name: "Gemini 3 Flash", percent: -1, used: "N/A", limit: "N/A", reset: "" }
+                    { name: "Gemini Pro", percent: -1, used: "N/A", limit: "N/A", reset: "" },
+                    { name: "Gemini Flash", percent: -1, used: "N/A", limit: "N/A", reset: "" }
                 ])
             };
         }
@@ -73,15 +73,31 @@ function parseAntigravityConfig(stdout) {
                 }
                 return null;
             }
+
+            // Match by pattern: find a model whose name contains ALL given keywords (case-insensitive)
+            function findModelByPattern(keywords) {
+                for (var i = 0; i < models.length; i++) {
+                    var name = (models[i].name || "").toLowerCase();
+                    var allMatch = true;
+                    for (var k = 0; k < keywords.length; k++) {
+                        if (name.indexOf(keywords[k].toLowerCase()) === -1) {
+                            allMatch = false;
+                            break;
+                        }
+                    }
+                    if (allMatch) return models[i];
+                }
+                return null;
+            }
             
             // 1. Claude / OpenAI Models (use Opus status)
             var opus = findModel("Opus") || findModel("Sonnet") || findModel("GPT-OSS") || {};
             
-            // 2. Gemini 3 Pro (High)
-            var geminiPro = findModel("Gemini 3 Pro (High)") || {};
+            // 2. Gemini Pro (High) - match any version containing both "gemini" and "pro"
+            var geminiPro = findModelByPattern(["gemini", "pro"]) || {};
             
-            // 3. Gemini 3 Flash
-            var geminiFlash = findModel("Gemini 3 Flash") || {};
+            // 3. Gemini Flash - match any version containing both "gemini" and "flash"
+            var geminiFlash = findModelByPattern(["gemini", "flash"]) || {};
             
             return {
                 provider: "antigravity",
@@ -90,21 +106,21 @@ function parseAntigravityConfig(stdout) {
                 
                 bucketsJson: makeBucketsJson([
                     {
-                        name: "Claude / OpenAI",
+                        name: opus.name || "Claude / OpenAI",
                         percent: opus.remaining !== undefined ? opus.remaining : 0,
                         used: "N/A",
                         limit: "N/A",
                         reset: opus.reset || ""
                     },
                     {
-                        name: "Gemini 3 Pro",
+                        name: geminiPro.name || "Gemini Pro",
                         percent: geminiPro.remaining !== undefined ? geminiPro.remaining : 0,
                         used: "N/A",
                         limit: "N/A",
                         reset: geminiPro.reset || ""
                     },
                     {
-                        name: "Gemini 3 Flash",
+                        name: geminiFlash.name || "Gemini Flash",
                         percent: geminiFlash.remaining !== undefined ? geminiFlash.remaining : 0,
                         used: "N/A",
                         limit: "N/A",

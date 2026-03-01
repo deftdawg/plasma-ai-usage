@@ -148,8 +148,10 @@ def main():
         for model in models:
             quota = model.get("quotaInfo") or {}
             remaining_fraction = quota.get("remainingFraction")
+            
+            # Treat None or missing as 0 (depleted)
             if remaining_fraction is None:
-                continue
+                remaining_fraction = 0.0
                 
             label = model.get("label", "Unknown")
             reset_time = quota.get("resetTime")
