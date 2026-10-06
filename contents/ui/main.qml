@@ -23,6 +23,7 @@ PlasmoidItem {
     property string haPublishStatus: "disabled"  // "disabled", "success", "error"
     property bool haDialogVisible: false
     property bool showResetTimeToggle: false  // Alternates on refresh for 0% display
+    property string jsonFilePublishStatus: "disabled"  // "disabled", "success", "error"
 
     // Model to store provider data
     ListModel {
@@ -69,6 +70,8 @@ PlasmoidItem {
             // Process Amp
             var ampProv = Providers.parseAmpConfig(ampData)
             if (ampProv) {
+                // Track 24h free-quota reset window for percent-based Amp Free
+                ampProv = Providers.applyAmpResetTracking(ampProv, Plasmoid.configuration)
                 providersModel.append(ampProv)
             }
 
@@ -151,6 +154,19 @@ PlasmoidItem {
             
             // Publish to Home Assistant if enabled
             publishToHomeAssistant()
+            
+            // Publish to JSON file if enabled
+            publishToJsonFile()
+        }
+    }
+
+    // Data source for writing/deleting the JSON status file
+    Plasma5Support.DataSource {
+        id: fileWriter
+        engine: "executable"
+        connectedSources: []
+        onNewData: function(sourceName, data) {
+            disconnectSource(sourceName)
         }
     }
 
@@ -256,9 +272,24 @@ PlasmoidItem {
                 providerData.buckets = getBuckets(p.bucketsJson)
                 providerData.error = p.error || ""
             } else if (p.provider === "amp") {
+                providerData.active_plan = p.activePlanName || ""
+                providerData.active_remaining = p.activeRemaining || 0
+                providerData.active_is_percent = p.activeIsPercent !== false
+                providerData.active_is_credits = p.activeIsCredits || false
+                providerData.active_remaining_percent = p.activeRemainingPercent !== undefined ? p.activeRemainingPercent : -1
+                providerData.reset_countdown = p.resetCountdown || ""
+                providerData.reset_compact = p.resetCompact || ""
+                providerData.has_active_countdown = p.hasActiveCountdown || false
+                providerData.credit_balance = p.creditBalance || 0
+                providerData.plans = buildAmpPlansExport(p)
+                // Free upcoming reset (within 6h, Free not active) — tray green bracket
+                providerData.free_upcoming_reset = p.showFreeUpcoming ? (p.freeUpcomingCompact || "") : ""
+                providerData.show_free_upcoming = p.showFreeUpcoming || false
+                // Legacy fields
                 providerData.free_used = p.freeUsed || 0
                 providerData.free_limit = p.freeLimit || 0
-                providerData.credit_balance = p.creditBalance || 0
+                providerData.free_is_percent = p.freeIsPercent || false
+                providerData.free_resets = p.freeResets || ""
             }
             
             providers.push(providerData)
@@ -291,6 +322,89 @@ PlasmoidItem {
         }
         
         xhr.send(JSON.stringify(payload))
+    }
+
+    function publishToJsonFile() {
+        if (!Plasmoid.configuration.jsonFileEnabled) {
+            root.jsonFilePublishStatus = "disabled"
+            return
+        }
+        
+        var providers = []
+        for (var i = 0; i < providersModel.count; i++) {
+            var p = providersModel.get(i)
+            var providerData = {
+                name: p.name,
+                provider: p.provider
+            }
+            
+            if (p.provider === "claude") {
+                var sessionUsage = p.sessionUsage || 0
+                var weeklyUsage = p.weeklyUsage || 0
+                providerData.session_remaining = Math.round(100 - sessionUsage)
+                providerData.weekly_remaining = Math.round(100 - weeklyUsage)
+                providerData.sonnet_remaining = Math.round(100 - (p.sonnetUsage || 0))
+                providerData.opus_remaining = Math.round(100 - (p.opusUsage || 0))
+                providerData.session_reset = p.sessionReset || ""
+                providerData.weekly_reset = p.weeklyReset || ""
+            } else if (p.provider === "antigravity") {
+                var buckets = getBuckets(p.bucketsJson)
+                for (var b = 0; b < buckets.length; b++) {
+                    buckets[b].percent_remaining = buckets[b].percent !== undefined ? Math.round(buckets[b].percent) : -1
+                    delete buckets[b].percent
+                }
+                providerData.buckets = buckets
+                providerData.error = p.error || ""
+            } else if (p.provider === "amp") {
+                providerData.active_plan = p.activePlanName || ""
+                providerData.active_remaining = p.activeIsPercent
+                    ? Math.round(p.activeRemaining || 0)
+                    : (p.activeRemaining || 0)
+                providerData.active_is_percent = p.activeIsPercent !== false
+                providerData.active_is_credits = p.activeIsCredits || false
+                providerData.active_remaining_percent = p.activeRemainingPercent !== undefined ? p.activeRemainingPercent : -1
+                providerData.reset_countdown = p.resetCountdown || ""
+                providerData.reset_compact = p.resetCompact || ""
+                providerData.has_active_countdown = p.hasActiveCountdown || false
+                providerData.credit_balance = p.creditBalance || 0
+                // Multi-plan export: name, remaining quota, reset time
+                providerData.plans = buildAmpPlansExport(p)
+                // Free upcoming reset (within 6h, Free not active) — tray green bracket
+                // e.g. "MW 44% 19d (2¼h)" → free_upcoming_reset = "2¼h"
+                providerData.free_upcoming_reset = p.showFreeUpcoming ? (p.freeUpcomingCompact || "") : ""
+                providerData.show_free_upcoming = p.showFreeUpcoming || false
+                // Legacy fields for older consumers
+                var freeUsed = p.freeUsed || 0
+                var freeLimit = p.freeLimit || 0
+                providerData.free_used = freeUsed
+                providerData.free_limit = freeLimit
+                providerData.free_is_percent = p.freeIsPercent || false
+                providerData.free_remaining = Math.round(freeLimit > 0 ? ((freeLimit - freeUsed) / freeLimit * 100) : 0)
+                providerData.free_resets = p.freeResets || ""
+            }
+            
+            providers.push(providerData)
+        }
+        
+        var payload = {
+            state: root.errorMsg ? "error" : "ok",
+            providers: providers,
+            last_updated: new Date().toISOString()
+        }
+        
+        var json = JSON.stringify(payload)
+        var b64 = Qt.btoa(json)
+        var cmd = "mkdir -p $HOME/.cache && echo " + b64 + " | base64 -d > $HOME/.cache/ai-usage-status.json"
+        fileWriter.connectSource(cmd + " # " + new Date().getTime())
+        root.jsonFilePublishStatus = "success"
+        console.log("JSON File: Published to ~/.cache/ai-usage-status.json")
+    }
+
+    function deleteJsonFile() {
+        var cmd = "rm -f $HOME/.cache/ai-usage-status.json"
+        fileWriter.connectSource(cmd + " # " + new Date().getTime())
+        root.jsonFilePublishStatus = "disabled"
+        console.log("JSON File: Deleted ~/.cache/ai-usage-status.json")
     }
 
     function formatResetTime(resetTimeStr) {
@@ -336,6 +450,68 @@ PlasmoidItem {
         catch (e) { return []; }
     }
 
+    function getAmpPlans(provider) {
+        if (!provider) return []
+        // Prefer multi-plan JSON; fall back to synthesizing from legacy fields
+        var plans = getBuckets(provider.plansJson)
+        if (plans.length > 0) return plans
+        var legacy = []
+        if (provider.freeLimit > 0 || provider.freeIsPercent) {
+            var rem = provider.freeIsPercent
+                ? (provider.freePercent !== undefined ? provider.freePercent : (provider.freeLimit - provider.freeUsed))
+                : (provider.freeLimit > 0 ? ((provider.freeLimit - provider.freeUsed) / provider.freeLimit * 100) : 0)
+            legacy.push({
+                name: "Free",
+                kind: "free",
+                shortLabel: "free",
+                remaining: rem,
+                remainingIsPercent: true,
+                resetLabel: provider.freeResets || "",
+                resetCompact: provider.resetCompact || "",
+                resetCountdown: provider.resetCountdown || "",
+                hasActiveCountdown: provider.hasActiveCountdown || false,
+                resetMsLeft: provider.resetMsLeft !== undefined ? provider.resetMsLeft : -1
+            })
+        }
+        if (provider.creditBalance !== undefined && provider.creditBalance !== null) {
+            legacy.push({
+                name: "Credits",
+                kind: "credits",
+                shortLabel: "",
+                remaining: provider.creditBalance || 0,
+                remainingIsPercent: false,
+                resetLabel: "",
+                resetCompact: "",
+                resetCountdown: ""
+            })
+        }
+        return legacy
+    }
+
+    /** Build JSON-export shape for Amp plans: name, remaining, reset */
+    function buildAmpPlansExport(provider) {
+        var plans = getAmpPlans(provider)
+        var out = []
+        for (var i = 0; i < plans.length; i++) {
+            var pl = plans[i]
+            var entry = {
+                name: pl.name || "",
+                remaining: pl.remainingIsPercent === false
+                    ? (pl.remaining || 0)
+                    : Math.round(pl.remaining || 0),
+                remaining_is_percent: pl.remainingIsPercent !== false,
+                remaining_percent: pl.remainingPercent !== undefined ? pl.remainingPercent : -1,
+                reset: pl.resetCountdown || pl.resetCompact || pl.resetLabel || ""
+            }
+            if (pl.otherRemaining !== undefined && pl.otherRemaining >= 0)
+                entry.other_remaining = Math.round(pl.otherRemaining)
+            if (pl.orbRemaining !== undefined && pl.orbRemaining >= 0)
+                entry.orb_remaining = Math.round(pl.orbRemaining)
+            out.push(entry)
+        }
+        return out
+    }
+
     function getProviderTooltipText(provider) {
         if (!provider) return ""
         
@@ -359,16 +535,60 @@ PlasmoidItem {
 
     function getAmpTooltipText(provider) {
         if (!provider) return ""
-        var remainingPercent = provider.freeLimit > 0 ? ((provider.freeLimit - provider.freeUsed) / provider.freeLimit * 100) : 0
-        var base = Math.round(remainingPercent) + "% " + i18n.tr("remaining")
-        
-        if (provider.rechargeRate > 0 && provider.freeUsed > 0) {
-            var hours = provider.freeUsed / provider.rechargeRate
-            var target = new Date(new Date().getTime() + hours * 3600000)
-            var timeStr = Qt.formatTime(target, "h:mm ap").toLowerCase()
-            return base + " (" + i18n.tr("used") + " $" + provider.freeUsed.toFixed(2) + "/$" + provider.rechargeRate.toFixed(2) + "/h -> " + Math.round(hours) + "h -> ~" + timeStr + ")"
+        var plans = getAmpPlans(provider)
+        if (plans.length === 0) {
+            // Last-resort legacy single-line tooltip
+            if (provider.activeIsCredits || (provider.creditBalance > 0 && !provider.freeIsPercent))
+                return i18n.tr("Credit Balance:") + " $" + (provider.creditBalance || 0).toFixed(2)
+            return Math.round(provider.activeRemaining || 0) + "% " + i18n.tr("remaining")
         }
-        return base
+
+        var parts = []
+        for (var i = 0; i < plans.length; i++) {
+            var pl = plans[i]
+            var label = pl.name || ("Plan " + (i + 1))
+            var remStr
+            if (pl.kind === "credits") {
+                remStr = "$" + Number(pl.remaining || 0).toFixed(2)
+            } else if (pl.remainingIsPercent === false) {
+                remStr = "⚡$" + Number(pl.remaining || 0).toFixed(2)
+                if (pl.orbRemaining >= 0)
+                    remStr += " + 🔮" + Math.round(pl.orbRemaining) + "%"
+            } else if (pl.otherRemaining >= 0 && pl.orbRemaining >= 0) {
+                // ⚡ agent (other) + 🔮 orb
+                remStr = "⚡" + Math.round(pl.otherRemaining) + "% + 🔮" + Math.round(pl.orbRemaining) + "%"
+            } else {
+                remStr = "⚡" + Math.round(pl.remaining || 0) + "%"
+            }
+            var resetStr = pl.resetCountdown || pl.resetCompact || pl.resetLabel || ""
+            var piece = label + ": " + remStr
+            if (resetStr) piece += " (" + i18n.tr("Resets:") + " " + resetStr + ")"
+            // Mark the active plan
+            if (provider.activePlanName && pl.name === provider.activePlanName)
+                piece = "▶ " + piece
+            parts.push(piece)
+        }
+        // Free upcoming within 6h while on another plan
+        if (provider.showFreeUpcoming && provider.freeUpcomingCompact) {
+            parts.push(i18n.tr("Free resets in:") + " " + provider.freeUpcomingCompact)
+        }
+        return parts.join(" | ")
+    }
+
+    // Color for Amp countdown time: >=12h green, >=6h yellow, <6h red
+    function getAmpTimeColor(msLeft) {
+        if (msLeft < 0) return Kirigami.Theme.disabledTextColor
+        var hoursLeft = msLeft / 3600000
+        if (hoursLeft >= 12) return Kirigami.Theme.positiveTextColor
+        if (hoursLeft >= 6) return Kirigami.Theme.neutralTextColor
+        return Kirigami.Theme.negativeTextColor
+    }
+
+    // Color for Amp remaining % (same scheme as the free-quota bar)
+    function getAmpRemainingColor(remainingPct) {
+        if (remainingPct > 50) return Kirigami.Theme.positiveTextColor
+        if (remainingPct > 20) return Kirigami.Theme.neutralTextColor
+        return Kirigami.Theme.negativeTextColor
     }
 
     // Compact representation (panel)
@@ -440,20 +660,47 @@ PlasmoidItem {
                     property real firstBucketPercent: antigravityBuckets.length > 0 ? (antigravityBuckets[0].percent !== undefined ? antigravityBuckets[0].percent : -1) : -1
                     property string firstBucketReset: antigravityBuckets.length > 0 ? (antigravityBuckets[0].reset || "") : ""
                     
+                    // Amp active plan (first plan with remaining > 0; Free → MW/GW → Credits)
+                    property real ampRemainingPct: {
+                        if (!isAmp) return 0
+                        if (model.activeRemainingPercent !== undefined && model.activeRemainingPercent >= 0)
+                            return model.activeRemainingPercent
+                        if (model.activeIsPercent !== false && !model.activeIsCredits)
+                            return model.activeRemaining || 0
+                        return 0
+                    }
+                    // Plan tag: "free" / "MW" / "GW" — hidden for credits ($ is enough)
+                    property string ampPlanTag: {
+                        if (!isAmp) return ""
+                        if (model.activeIsCredits) return ""
+                        return model.activePlanShort || ""
+                    }
+                    property bool ampShowPlanTag: isAmp && ampPlanTag !== ""
+                    property bool ampShowCountdown: isAmp && model.resetCompact && model.resetCompact !== ""
+                    // Free upcoming reset within 6h while on MW/GW/credits: green "(2¼h)"
+                    property bool ampShowFreeUpcoming: isAmp && model.showFreeUpcoming && model.freeUpcomingCompact
+                    property string ampFreeUpcomingText: ampShowFreeUpcoming
+                        ? ("(" + (model.freeUpcomingCompact || "") + ")")
+                        : ""
+                    
                     property real displayValue: {
                         if (isAmp) {
-                            if (model.freeLimit > 0 && model.freeUsed < model.freeLimit) {
-                                return Math.floor(model.freeLimit - model.freeUsed)
-                            } else {
-                                return Math.floor(model.creditBalance || 0)
-                            }
+                            if (model.activeIsCredits)
+                                return model.activeRemaining || model.creditBalance || 0
+                            if (model.activeIsPercent !== false)
+                                return model.activeRemaining || 0
+                            return model.activeRemaining || model.creditBalance || 0
                         }
                         if (isAntigravity) return firstBucketPercent !== -1 ? firstBucketPercent : 0
                         return model.sessionUsage || 0
                     }
                     
                     property string displayText: {
-                        if (isAmp) return "$" + displayValue
+                        if (isAmp) {
+                            if (model.activeIsCredits || model.activeIsPercent === false)
+                                return "$" + Number(displayValue).toFixed(2)
+                            return Math.round(displayValue) + "%"
+                        }
                         if (isAntigravity && firstBucketPercent === -1) return "?%"
                         if (isAntigravity && Math.round(firstBucketPercent) === 0 && root.showResetTimeToggle && firstBucketReset) {
                             return getLargestResetComponent(firstBucketReset)
@@ -463,11 +710,9 @@ PlasmoidItem {
                     
                     property color displayColor: {
                         if (isAmp) {
-                            if (model.freeLimit > 0 && model.freeUsed < model.freeLimit) {
-                                return Kirigami.Theme.positiveTextColor
-                            } else {
+                            if (model.activeIsCredits)
                                 return Kirigami.Theme.neutralTextColor
-                            }
+                            return getAmpRemainingColor(ampRemainingPct)
                         }
                         if (isAntigravity && isRemainingMode) {
                              if (firstBucketPercent === -1) return Kirigami.Theme.disabledTextColor
@@ -487,9 +732,44 @@ PlasmoidItem {
                         color: parent.displayColor
                     }
                     
+                    // Amp plan indicator: free / MW / GW (credits identified by $ amount)
+                    PlasmaComponents.Label {
+                        visible: parent.ampShowPlanTag
+                        text: parent.ampPlanTag
+                        color: Kirigami.Theme.disabledTextColor
+                        font.pixelSize: Kirigami.Theme.smallFont.pixelSize
+                        font.bold: true
+                    }
+                    
+                    // Amp remaining % or $ credits — color by remaining quota
                     PlasmaComponents.Label {
                         text: parent.displayText
                         color: (parent.isAmp || (parent.isAntigravity && parent.isRemainingMode)) ? parent.displayColor : Kirigami.Theme.textColor
+                        font.bold: true
+                    }
+                    
+                    // Amp reset time next to amount
+                    // e.g. "free 88% 4h" | "MW 100% 1mo" | "$175.38 (6d)" (credits: soonest sub/free reset)
+                    PlasmaComponents.Label {
+                        visible: parent.ampShowCountdown
+                        text: {
+                            var t = model.resetCompact || ""
+                            if (!t) return ""
+                            // Credits: parenthesize soonest subscription/free reset
+                            if (model.activeIsCredits) return "(" + t + ")"
+                            return t
+                        }
+                        color: model.hasActiveCountdown
+                               ? getAmpTimeColor(model.resetMsLeft)
+                               : Kirigami.Theme.disabledTextColor
+                        font.bold: true
+                    }
+                    
+                    // Free upcoming reset within 6h (green): "MW 44% 19d (2¼h)"
+                    PlasmaComponents.Label {
+                        visible: parent.ampShowFreeUpcoming
+                        text: parent.ampFreeUpcomingText
+                        color: Kirigami.Theme.positiveTextColor
                         font.bold: true
                     }
                 }
@@ -662,32 +942,91 @@ PlasmoidItem {
                         }
                     }
 
-                    // Amp Specific UI
+                    // Amp Specific UI — one row per plan (Free / Megawatt / Gigawatt / Credits)
                     ColumnLayout {
+                        id: ampLayout
                         visible: model.provider === "amp"
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
 
-                        UsageBar {
-                            label: i18n.tr("Free Quota")
-                            property real remainingPercent: model.freeLimit > 0 ? ((model.freeLimit - model.freeUsed) / model.freeLimit * 100) : 0
-                            value: remainingPercent
-                            valueText: "$" + (model.freeLimit - model.freeUsed).toFixed(2) + "/$" + (model.freeLimit || 0).toFixed(2)
-                            customColor: remainingPercent > 50 ? Kirigami.Theme.positiveTextColor : (remainingPercent > 20 ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.negativeTextColor)
-                            subtext: model.freeResets ? i18n.tr("Replenishes:") + " " + model.freeResets : ""
-                            
-                            tooltipText: getAmpTooltipText(model)
-                        }
-                        
-                        RowLayout {
-                            Layout.fillWidth: true
-                            PlasmaComponents.Label {
-                                text: i18n.tr("Credit Balance:")
-                            }
-                            Item { Layout.fillWidth: true }
-                            PlasmaComponents.Label {
-                                text: "$" + (model.creditBalance || 0).toFixed(2)
-                                font.bold: true
+                        property var ampPlansList: getAmpPlans(model)
+                        property string ampActiveName: model.activePlanName || ""
+
+                        Repeater {
+                            model: ampLayout.ampPlansList
+                            delegate: ColumnLayout {
+                                required property var modelData
+                                required property int index
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                property bool isCredits: modelData.kind === "credits"
+                                property bool isActive: ampLayout.ampActiveName !== "" && modelData.name === ampLayout.ampActiveName
+                                property real remPct: {
+                                    if (isCredits) return 0
+                                    if (modelData.remainingPercent !== undefined && modelData.remainingPercent >= 0)
+                                        return modelData.remainingPercent
+                                    if (modelData.remainingIsPercent !== false)
+                                        return modelData.remaining || 0
+                                    return 0
+                                }
+                                property string valueLabel: {
+                                    if (isCredits)
+                                        return "$" + Number(modelData.remaining || 0).toFixed(2)
+                                    var agent
+                                    if (modelData.remainingIsPercent === false)
+                                        agent = "$" + Number(modelData.remaining || 0).toFixed(2)
+                                    else if (modelData.otherRemaining >= 0)
+                                        agent = Math.round(modelData.otherRemaining) + "%"
+                                    else
+                                        agent = Math.round(modelData.remaining || 0) + "%"
+                                    // Dual pool: ⚡ agent + 🔮 orb percent (orb is popup-only)
+                                    if (modelData.orbRemaining >= 0)
+                                        return "⚡" + agent + " + 🔮" + Math.round(modelData.orbRemaining) + "%"
+                                    return "⚡" + agent
+                                }
+                                property string resetText: modelData.resetCountdown || modelData.resetCompact || modelData.resetLabel || ""
+
+                                // Credits: simple balance row (no progress bar)
+                                RowLayout {
+                                    visible: isCredits
+                                    Layout.fillWidth: true
+                                    PlasmaComponents.Label {
+                                        text: (isActive ? "▶ " : "") + (modelData.name === "Credits" ? i18n.tr("Credit Balance:") : (modelData.name || i18n.tr("Credit Balance:")))
+                                        font.bold: isActive
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                    PlasmaComponents.Label {
+                                        text: valueLabel
+                                        font.bold: true
+                                        color: Kirigami.Theme.neutralTextColor
+                                    }
+                                }
+
+                                // Free / subscription: remaining bar
+                                UsageBar {
+                                    visible: !isCredits
+                                    label: (isActive ? "▶ " : "") + (modelData.name || ("Plan " + (index + 1)))
+                                    value: remPct
+                                    valueText: valueLabel
+                                    customColor: {
+                                        if (remPct > 50) return Kirigami.Theme.positiveTextColor
+                                        if (remPct > 20) return Kirigami.Theme.neutralTextColor
+                                        return Kirigami.Theme.negativeTextColor
+                                    }
+                                    subtext: {
+                                        if (!resetText) return ""
+                                        if (modelData.hasActiveCountdown && modelData.resetCountdown)
+                                            return i18n.tr("Resets in:") + " " + modelData.resetCountdown
+                                        return i18n.tr("Resets:") + " " + resetText
+                                    }
+                                    tooltipSuffix: i18n.tr("remaining")
+                                    tooltipText: {
+                                        var t = (modelData.name || "") + ": " + valueLabel + " " + i18n.tr("remaining")
+                                        if (resetText) t += " (" + i18n.tr("Resets:") + " " + resetText + ")"
+                                        return t
+                                    }
+                                }
                             }
                         }
                     }
@@ -751,17 +1090,83 @@ PlasmoidItem {
                             console.log("HA Button clicked!")
                             root.haDialogVisible = true
                         }
+                        
+                        PlasmaComponents.ToolTip {
+                            text: haButtonContainer.tooltipText
+                            visible: haMouseArea.containsMouse
+                        }
                     }
                     
-                    // Tooltip text via property for hover display
                     property string tooltipText: {
+                        var prefix = i18n.tr("Home Assistant") + ": "
                         if (!Plasmoid.configuration.haEnabled)
-                            return i18n.tr("Publishing disabled")
+                            return prefix + i18n.tr("Publishing disabled")
                         if (root.haPublishStatus === "success")
-                            return i18n.tr("Publishing enabled") + " - " + i18n.tr("Connection successful")
+                            return prefix + i18n.tr("Publishing enabled") + " - " + i18n.tr("Connection successful")
                         if (root.haPublishStatus === "error")
-                            return i18n.tr("Publishing enabled") + " - " + i18n.tr("Connection failed")
-                        return i18n.tr("Publishing enabled")
+                            return prefix + i18n.tr("Publishing enabled") + " - " + i18n.tr("Connection failed")
+                        return prefix + i18n.tr("Publishing enabled")
+                    }
+                }
+                
+                // JSON File Export Toggle Button
+                Item {
+                    id: jsonButtonContainer
+                    width: refreshButton.height
+                    height: refreshButton.height
+                    
+                    Rectangle {
+                        id: jsonButton
+                        anchors.fill: parent
+                        radius: 4
+                        color: jsonMouseArea.pressed ? Qt.darker(Kirigami.Theme.backgroundColor, 1.5) : (jsonMouseArea.containsMouse ? Qt.darker(Kirigami.Theme.backgroundColor, 1.3) : "#000000")
+                        border.width: 2
+                        border.color: {
+                            if (!Plasmoid.configuration.jsonFileEnabled)
+                                return Kirigami.Theme.disabledTextColor
+                            if (root.jsonFilePublishStatus === "success")
+                                return Kirigami.Theme.positiveTextColor
+                            if (root.jsonFilePublishStatus === "error")
+                                return Kirigami.Theme.negativeTextColor
+                            return Kirigami.Theme.disabledTextColor
+                        }
+                        
+                        Kirigami.Icon {
+                            anchors.centerIn: parent
+                            width: Kirigami.Units.iconSizes.smallMedium
+                            height: Kirigami.Units.iconSizes.smallMedium
+                            source: Qt.resolvedUrl("../icons/json-file.svg")
+                            color: Plasmoid.configuration.jsonFileEnabled ? "#f5a623" : Kirigami.Theme.disabledTextColor
+                            isMask: true
+                        }
+                    }
+                    
+                    MouseArea {
+                        id: jsonMouseArea
+                        anchors.fill: parent
+                        z: 100
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        
+                        onClicked: {
+                            Plasmoid.configuration.jsonFileEnabled = !Plasmoid.configuration.jsonFileEnabled
+                            if (Plasmoid.configuration.jsonFileEnabled) {
+                                publishToJsonFile()
+                            } else {
+                                deleteJsonFile()
+                            }
+                        }
+                        
+                        PlasmaComponents.ToolTip {
+                            text: jsonButtonContainer.tooltipText
+                            visible: jsonMouseArea.containsMouse
+                        }
+                    }
+                    
+                    property string tooltipText: {
+                        if (!Plasmoid.configuration.jsonFileEnabled)
+                            return i18n.tr("JSON file export disabled")
+                        return i18n.tr("JSON file export enabled") + " (~/.cache/ai-usage-status.json)"
                     }
                 }
                 
@@ -1019,7 +1424,8 @@ PlasmoidItem {
 
     Timer {
         id: refreshTimer
-        interval: (Plasmoid.configuration.refreshInterval || 1) * 60000
+        // Amp usage lookups are limited (~60/hour). Never poll faster than 65s.
+        interval: Math.max(65000, (Plasmoid.configuration.refreshInterval || 1) * 60000)
         running: true
         repeat: true
         onTriggered: loadCredentials()

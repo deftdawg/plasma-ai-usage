@@ -1,9 +1,65 @@
 {
   "lockfile_version": "1",
   "packages": {
+    "github:NixOS/nixpkgs/nixpkgs-unstable": {
+      "last_modified": "2025-12-31T03:27:36Z",
+      "resolved": "github:NixOS/nixpkgs/f665af0cdb70ed27e1bd8f9fdfecaf451260fc55?lastModified=1767151656&narHash=sha256-ujL2AoYBnJBN262HD95yer7QYUmYp5kFZGYbyCCKxq8%3D"
+    },
+    "kdePackages.plasma-sdk@latest": {
+      "last_modified": "2026-01-19T00:39:23Z",
+      "resolved": "github:NixOS/nixpkgs/bde09022887110deb780067364a0818e89258968#kdePackages.plasma-sdk",
+      "source": "devbox-search",
+      "version": "6.5.5",
+      "systems": {
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/ay3nkkghx94l8yqh4ib05xsq4lqj1p5k-plasma-sdk-6.5.5",
+              "default": true
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/0bbmj64wzbdmq4mhkcbq1mbd8gi42z91-plasma-sdk-6.5.5-debug"
+            },
+            {
+              "name": "dev",
+              "path": "/nix/store/b36m74sn6x9hibij8d9xs9cm1g2chkxc-plasma-sdk-6.5.5-dev"
+            },
+            {
+              "name": "devtools",
+              "path": "/nix/store/2hs1pbc0pj7ixxbw36x5hwm1ijfzdmrf-plasma-sdk-6.5.5-devtools"
+            }
+          ],
+          "store_path": "/nix/store/ay3nkkghx94l8yqh4ib05xsq4lqj1p5k-plasma-sdk-6.5.5"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/hi8kxinl2ikgnpn278cnza74g0g5ka6r-plasma-sdk-6.5.5",
+              "default": true
+            },
+            {
+              "name": "debug",
+              "path": "/nix/store/vcpidd7h59pm81w0a1gipnl7zkkng1n6-plasma-sdk-6.5.5-debug"
+            },
+            {
+              "name": "dev",
+              "path": "/nix/store/vlg2gl0j7v7lpirib657ffgkhn3mx9im-plasma-sdk-6.5.5-dev"
+            },
+            {
+              "name": "devtools",
+              "path": "/nix/store/gxq0xajsfljlr1rb1677l0payp3byh46-plasma-sdk-6.5.5-devtools"
+            }
+          ],
+          "store_path": "/nix/store/hi8kxinl2ikgnpn278cnza74g0g5ka6r-plasma-sdk-6.5.5"
+        }
+      }
+    },
     "nodejs@latest": {
       "last_modified": "2026-01-20T02:11:35Z",
-      "plugin_version": "0.0.2",
+      "plugin_version": "0.0.5",
       "resolved": "github:NixOS/nixpkgs/ed142ab1b3a092c4d149245d0c4126a5d7ea00b0#nodejs_25",
       "source": "devbox-search",
       "version": "25.4.0",

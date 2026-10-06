@@ -11,7 +11,7 @@
             <default>system</default>
         </entry>
         <entry name="refreshInterval" type="Int">
-            <label>Refresh interval in minutes</label>
+            <label>Refresh interval in minutes (polled no faster than every 65 seconds)</label>
             <default>1</default>
         </entry>
         <entry name="haEnabled" type="Bool">
@@ -25,6 +25,18 @@
         <entry name="haAccessToken" type="String">
             <label>Home Assistant long-lived access token</label>
             <default></default>
+        </entry>
+        <entry name="jsonFileEnabled" type="Bool">
+            <label>Enable publishing usage data to JSON file (used by the powerline widget)</label>
+            <default>true</default>
+        </entry>
+        <entry name="ampResetAt" type="String">
+            <label>ISO timestamp when Amp free quota last reset to 100%</label>
+            <default></default>
+        </entry>
+        <entry name="ampLastRemainingPercent" type="Double">
+            <label>Previous Amp free remaining percent for reset detection</label>
+            <default>-1</default>
         </entry>
     </group>
 </kcfg>

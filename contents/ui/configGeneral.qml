@@ -17,6 +17,7 @@ KCM.SimpleKCM {
     property bool cfg_haEnabled
     property string cfg_haSensorUri
     property string cfg_haAccessToken
+    property bool cfg_jsonFileEnabled
 
     // Translation helper
     Translations {
@@ -72,6 +73,13 @@ KCM.SimpleKCM {
             }
         }
 
+        QQC2.Label {
+            text: tr("Amp usage is polled no more often than every 65 seconds.")
+            font.italic: true
+            color: Kirigami.Theme.disabledTextColor
+            wrapMode: Text.WordWrap
+        }
+
         // Home Assistant Section
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
@@ -120,6 +128,26 @@ KCM.SimpleKCM {
                     cursorShape: parent.hoveredLink ? Qt.PointingHandCursor : Qt.ArrowCursor
                 }
             }
+        }
+
+        // JSON File Export Section
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: tr("JSON File Export")
+        }
+
+        QQC2.Switch {
+            id: jsonFileEnabledSwitch
+            Kirigami.FormData.label: tr("Export usage data to JSON file")
+            checked: cfg_jsonFileEnabled
+            onCheckedChanged: cfg_jsonFileEnabled = checked
+        }
+
+        QQC2.Label {
+            visible: jsonFileEnabledSwitch.checked
+            text: "~/.cache/ai-usage-status.json " + tr("(powerline widget default source)")
+            font.italic: true
+            color: Kirigami.Theme.disabledTextColor
         }
     }
 }

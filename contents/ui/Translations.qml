@@ -26,6 +26,7 @@ QtObject {
             "Opus": "Opus",
             "Resets at:": "Resets at:",
             "Resets:": "Resets:",
+            "Resets in:": "Resets in:",
             "Updated:": "Updated:",
             "Loading...": "Loading...",
             "Refresh": "Refresh",
@@ -42,6 +43,8 @@ QtObject {
             "m": "m",
             "Refresh interval:": "Refresh interval:",
             "minutes": "minutes",
+            "Amp usage is polled no more often than every 65 seconds.": "Amp usage is polled no more often than every 65 seconds.",
+            "(powerline widget default source)": "(powerline widget default source)",
             "Free Quota": "Free Quota",
             "Credit Balance:": "Credit Balance:",
             "Replenishes:": "Replenishes:",
@@ -62,7 +65,11 @@ QtObject {
             "Connection failed": "Connection failed",
             "Configure Home Assistant": "Configure Home Assistant",
             "Save": "Save",
-            "Cancel": "Cancel"
+            "Cancel": "Cancel",
+            "JSON file export enabled": "JSON file export enabled",
+            "JSON file export disabled": "JSON file export disabled",
+            "JSON File Export": "JSON File Export",
+            "Export usage data to JSON file": "Export usage data to JSON file"
         },
         "hu_HU": {
             "Claude Usage": "Claude használat",
